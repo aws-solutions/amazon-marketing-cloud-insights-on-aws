@@ -1,0 +1,19 @@
+aws-cdk-lib>=2.87.0
+boto3<2.0.0,>=1.24.11
+aws-lambda-powertools
+crhelper~=2.0.11
+pytest
+pytest-cov
+pytest-env>=0.6.2
+pytest-mock>=3.10.0
+moto>=4.1.10
+cdk-nag
+pandas
+docker
+openapi-spec-validator
+pyparsing
+-e ../../infrastructure/data_lake/lambda_layers/data_lake_library/python
+-e ../../cdk_solution_helper_py/helpers_cdk
+-e ../../cdk_solution_helper_py/helpers_common
+-e ../../infrastructure
+-e ../../tests
