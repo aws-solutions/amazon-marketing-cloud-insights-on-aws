@@ -48,37 +48,6 @@ mkdir -p $build_dist_dir
 # remove old cdk.out folder before build
 rm -rf $cdk_out
 
-# echo "------------------------------------------------------------------------------"
-# echo "[Packing] Templates"
-# echo "------------------------------------------------------------------------------"
-# echo "cp $template_dir/*.template $template_dist_dir/"
-# cp $template_dir/*.template $template_dist_dir/
-# echo "copy yaml templates and rename"
-# cp $template_dir/*.yaml $template_dist_dir/
-# cd $template_dist_dir
-# # Rename all *.yaml to *.template
-# for f in *.yaml; do 
-#     mv -- "$f" "${f%.yaml}.template"
-# done
-
-# cd ..
-# echo "Updating code source bucket in template with $1"
-# replace="s/%%SOLUTION_ID%%/$SOLUTION_ID/g"
-# echo "sed -i '' -e $replace $template_dist_dir/*.template"
-# sed -i '' -e $replace $template_dist_dir/*.template
-# replace="s/%%BUCKET_NAME%%/$1/g"
-# echo "sed -i '' -e $replace $template_dist_dir/*.template"
-# sed -i '' -e $replace $template_dist_dir/*.template
-# replace="s/%%BUCKET_NAME%%/$1/g"
-# echo "sed -i '' -e $replace $template_dist_dir/*.template"
-# sed -i '' -e $replace $template_dist_dir/*.template
-# replace="s/%%SOLUTION_NAME%%/$2/g"
-# echo "sed -i '' -e $replace $template_dist_dir/*.template"
-# sed -i '' -e $replace $template_dist_dir/*.template
-# replace="s/%%VERSION%%/$3/g"
-# echo "sed -i '' -e $replace $template_dist_dir/*.template"
-# sed -i '' -e $replace $template_dist_dir/*.template
-
 echo "------------------------------------------------------------------------------"
 echo "[Rebuild] CDK Solution"
 echo "------------------------------------------------------------------------------"

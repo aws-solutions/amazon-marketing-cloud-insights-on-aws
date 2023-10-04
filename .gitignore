@@ -1,0 +1,37 @@
+*.swp
+package-lock.json
+__pycache__
+.pytest_cache
+.env
+.*venv*
+*.egg-info
+.DS_Store
+/.DS_Store 
+.c9/*
+.vscode
+**/.idea/*
+
+# CDK asset staging directory
+cdk.context.json
+.cdk.staging
+cdk.out
+ddk.out/*
+.ddk.out/*
+.out
+*.zip
+
+global-s3-assets
+regional-s3-assets
+build-s3-assets
+
+# python build files
+source/cdk_solution_helper_py/helpers_common/build/*
+source/cdk_solution_helper_py/helpers_cdk/build/*
+
+# coverage
+.coverage
+*coverage-reports*
+
+# local sonarqube
+.scannerwork/*
+

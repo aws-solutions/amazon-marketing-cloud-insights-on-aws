@@ -1,0 +1,15 @@
+[run]
+omit =
+    tests/*
+    */scripts/*
+    app.py
+    setup.py
+
+source =
+    infrastructure
+
+[tool:pytest]
+addopts = --cov infrastructure
+
+[report]
+fail_under = 80.0
