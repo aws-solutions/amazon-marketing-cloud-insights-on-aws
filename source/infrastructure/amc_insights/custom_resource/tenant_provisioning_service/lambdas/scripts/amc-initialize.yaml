@@ -1,0 +1,453 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Parameters:
+  # Required Parameters
+  pBucketName:
+    Type: String
+    Description: "Creates the S3 Bucket with the specified name"
+  pTenantName:
+    Type: String
+    Description: "Customer Id"
+  pOrangeRoomAccountId:
+    Type: String
+    Description: "AWS Account ID for the AMC Data Upload Account"
+  pLambdaRoleArn:
+    Type: String
+    Description: "AddAMCInstance lambda role ARN"
+  pDataLakeEnabled:
+    Description: "If the data lake is enabled"
+    Type: String
+    AllowedValues: ["Yes", "No"]
+  pResourcePrefix:
+    Description: "Resource prefix for naming resources"
+    Type: String
+  pInstanceApiEndpoint:
+    Description: "API endpoint of the customer AMC Instance"
+    Type: String
+  pWfmLambdaRoleNames:
+    Description: "Lambda names for the WFM service that need API access"
+    Type: CommaDelimitedList
+  pRedRoomAccountId:
+    Description: "AWS Account ID for the AMC AWS Connected Account"
+    Type: String
+  pInstanceRegion:
+    Description: "Region of the customer AMC Instance"
+    Type: String
+  pLoggingBucketName:
+    Description: "Bucket name to store S3 event logs"
+    Type: String
+  pArtifactsBucketName:
+    Description: "Bucket name of the solution artifacts bucket"
+    Type: String
+  pTemplateUrl:
+    Description: "Artifacts bucket URL where the TPS service templates are stored"
+    Type: String
+  pApiInvokeRoleStandard:
+    Description: "Name of the standard API invoke role deployed with the main solution stack"
+    Type: String
+  pAmcApiId:
+    Description: "API ID of the AMC Instance"
+    Type: String
+  pApplicationRegion:
+    Description: "Region the solution is deployed in"
+    Type: String
+  pBucketRegion:
+    Description: "Region the AMC instance bucket is deployed in"
+    Type: String
+
+  # Optional Parameters
+  pBucketExists:
+    Description: "If AMC S3 Bucket Already Exists"
+    Type: String
+    AllowedValues: ["false", "true"]
+    Default: "true"
+  pRoutingQueueArn:
+    Description: "Data Lake Routing Queue ARN"
+    Type: String
+    Default: "NaN"
+  pBucketAccount:
+    Description: "AWS Account ID the customer instance S3 bucket is deployed in"
+    Type: String
+    Default: "NaN"
+  pSnsKeyId:
+    Description: "KMS key to use for new SNS topics"
+    Type: String
+    Default: "NaN"
+  pStageARoleName:
+    Description: "Role name for the Stage A process lambda"
+    Type: String
+    Default: "NaN"
+
+  # Deployment Overrides
+  pSkipCrossRegionEvents:
+    Description: "Skip creating cross region event rules"
+    Type: String
+    Default: "true"
+  pSkipAPIRoles:
+    Description: "Skip creating the customer API invoke role"
+    Type: String
+    Default: "false"
+  pSkipDatalakeTrigger:
+    Description: "Skip creating the datalake event rule"
+    Type: String
+    Default: "false"
+  pSkipSnsTopic:
+    Description: "Skip creating the custom SNS topic"
+    Type: String
+    Default: "false"
+  
+Conditions:
+  DeployS3Bucket: !Equals [!Ref pBucketExists, "false"]
+  DeployApiInvokePolicyStandard: !And
+    - !Equals [!Ref pRedRoomAccountId, !Ref "AWS::AccountId"]
+    - !Equals [!Ref pSkipAPIRoles, "false"]
+  DeployApiInvokePolicyCrossAccount: !And
+    - !Not [!Equals [!Ref pRedRoomAccountId, !Ref "AWS::AccountId"]]
+    - !Equals [!Ref pSkipAPIRoles, "false"]
+  DeployRuleExecuteDataLakeProcess: !And
+    - !Equals [!Ref pDataLakeEnabled, "Yes"]
+    - !Equals [!Ref pSkipDatalakeTrigger, "false"]
+  DeployCrossRegionEvents: !And 
+    - !Equals [!Ref pDataLakeEnabled, "Yes"]
+    - !Equals [!Ref pSkipCrossRegionEvents, "false"]
+  DeployCrossAccountEvents:  !And
+    - !Not [!Equals [!Ref pBucketAccount, "NaN"]]
+    - !Not [!Equals [!Ref pBucketAccount, !Ref "AWS::AccountId"]]
+  DeploySnsTopic: !And 
+    - !Equals [!Ref pSkipSnsTopic, "false"]
+    - !Not [!Equals [!Ref pSnsKeyId, "NaN"]]
+  DeployStandardRule: !And
+    - !Condition DeployRuleExecuteDataLakeProcess
+    - !Equals [!Ref pBucketAccount, "NaN"]
+  DeployCrossAccountRule: !And
+    - !Condition DeployRuleExecuteDataLakeProcess
+    - !Not [!Equals [!Ref pBucketAccount, "NaN"]]
+  DeployRuleExecuteDataLakeProcessStandard: !And
+    - !Condition DeployRuleExecuteDataLakeProcess
+    - !Condition DeployStandardRule
+  DeployRuleExecuteDataLakeProcessCrossAccount: !And
+    - !Condition DeployRuleExecuteDataLakeProcess
+    - !Condition DeployCrossAccountRule
+      
+Resources:
+
+  ###################################
+  ###     AMC INSTANCE BUCKET     ###
+  ###################################
+
+  rS3Bucket:
+    Type: AWS::S3::Bucket
+    Condition: DeployS3Bucket
+    DeletionPolicy: Retain
+    Properties:
+      BucketName: !Ref pBucketName
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: "aws:kms"
+              KMSMasterKeyID: !GetAtt rS3EncryptionKey.Arn
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: True
+        BlockPublicPolicy: True
+        IgnorePublicAcls: True
+        RestrictPublicBuckets: True
+      NotificationConfiguration:
+        EventBridgeConfiguration:
+          EventBridgeEnabled: true
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      VersioningConfiguration:
+        Status: Enabled
+
+  rS3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Condition: DeployS3Bucket
+    Properties:
+      Bucket: !Ref rS3Bucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Id: BucketDeliveryPolicy
+        Statement:
+          - Sid: BucketDelivery
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${pOrangeRoomAccountId}:root
+            Action:
+              - s3:PutObject
+              - s3:PutObjectAcl
+            Resource: !Sub arn:aws:s3:::${pBucketName}/*
+          - Sid: BucketOwnerAccess
+            Effect: Allow
+            Principal:
+              AWS: !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action: s3:*
+            Resource:
+              - !Sub arn:aws:s3:::${pBucketName}/*
+              - !Sub arn:aws:s3:::${pBucketName}
+
+  rS3EncryptionKey:
+    Type: AWS::KMS::Key
+    Condition: DeployS3Bucket
+    Properties:
+      Description: String
+      Enabled: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Id: key-consolepolicy-3
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: kms:*
+            Resource: "*"
+          - Sid: Enable AMC Write Permissions
+            Effect: Allow
+            Principal:
+              AWS:
+                - !Sub "arn:aws:iam::${pOrangeRoomAccountId}:root"
+            Action:
+              - kms:Encrypt
+              - kms:ReEncrypt*
+              - kms:GenerateDataKey*
+              - kms:DescribeKey
+            Condition:
+              StringEquals:
+                "kms:ViaService": !Sub "s3.${AWS::Region}.amazonaws.com"
+            Resource: "*"
+          - Sid: Enable AddAMCInstance service to Modify
+            Effect: Allow
+            Principal:
+              AWS: !Ref pLambdaRoleArn
+            Action:
+              - kms:CreateKey
+              - kms:TagResource
+              - kms:CreateAlias
+              - kms:UpdateAlias
+              - kms:DescribeKey
+              - kms:PutKeyPolicy
+              - kms:ScheduleKeyDeletion
+            Resource: "*"
+
+  rS3EncryptionKeyAlias:
+    Type: AWS::KMS::Alias
+    Condition: DeployS3Bucket
+    Properties:
+      AliasName: !Sub "alias/tps-${pTenantName}-kms-s3-encryption-key"
+      TargetKeyId: !Ref rS3EncryptionKey
+
+  ###################################
+  ###        API INVOKE           ###
+  ###################################
+
+  # API Invoke policy when deployed in the customer red room
+  rApiInvokePolicyStandard:
+    Type: AWS::IAM::Policy
+    Condition: DeployApiInvokePolicyStandard
+    Properties:
+      PolicyName: !Sub "${pResourcePrefix}-${pApplicationRegion}-${pTenantName}-invokeAmcApiPolicy"
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'execute-api:Invoke'
+            Resource:
+              - !Sub "arn:aws:execute-api:${pInstanceRegion}:*:${pAmcApiId}/*"
+      Roles: 
+        - !Ref pApiInvokeRoleStandard
+
+  # API Invoke policy when not deployed in the customer red room
+  rApiInvokePolicyCrossAccount:
+    Type: AWS::IAM::Policy
+    Condition: DeployApiInvokePolicyCrossAccount
+    Properties:
+      PolicyName: !Sub "${pResourcePrefix}-${pApplicationRegion}-${pTenantName}-invokeAmcApiPolicy"
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - 'sts:AssumeRole'
+            Resource: 
+              - !Sub "arn:aws:iam::${pRedRoomAccountId}:role/${pResourcePrefix}-${pApplicationRegion}-${pTenantName}-invokeAmcApiRole"
+      Roles: !Ref pWfmLambdaRoleNames
+
+  ###################################
+  ###        DATA LAKE            ###
+  ###################################
+
+  # Rule to trigger data lake in application region
+  rRuleExecuteDataLakeProcess:
+    Type: AWS::Events::Rule
+    Condition: DeployStandardRule
+    Properties:
+      Description: "Trigger SDLF data lake process"
+      State: "ENABLED"
+      EventPattern:
+        source:
+          - aws.s3
+        detail:
+          eventSource:
+            - s3.amazonaws.com
+          eventName:
+            - CopyObject
+            - PutObject
+            - CompleteMultipartUpload
+            - DeleteObject
+          requestParameters:
+            bucketName:
+              - !Ref pBucketName
+      Targets:
+        - Arn: !Ref pRoutingQueueArn
+          Id: "DataLakeRoutingQueueTrigger"
+
+  # Permission to allow the rule to invoke the data lake routing lambda
+  rStandardPermissionForRuleExecuteWorkflowExecutionQueueConsumer:
+    Type: AWS::Lambda::Permission
+    Condition: DeployRuleExecuteDataLakeProcessStandard
+    Properties:
+      FunctionName: !Ref pRoutingQueueArn
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt rRuleExecuteDataLakeProcess.Arn
+
+  # Role to allow cross-region events
+  rCrossRegionEventBridgeRole:
+    Type: AWS::IAM::Role
+    Condition: DeployCrossRegionEvents
+    Properties:
+      Description: !Sub "Role that will allow EventBridge to send event cross region"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - events.amazonaws.com
+            Action: "sts:AssumeRole"
+      Policies:
+        - PolicyName: !Join [ '-', [ CrossRegion, !Sub pTenantName, "EventBridgeRole" ] ]
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "events:PutEvents"
+                Resource:
+                  - !Sub arn:aws:events:${pApplicationRegion}:${AWS::AccountId}:event-bus/default
+
+  # Cross-region event rule for data lake trigger
+  rCrossRegionEventBridgeRule:
+    Type: AWS::Events::Rule
+    Condition: DeployCrossRegionEvents
+    Properties:
+      Description: "Trigger cross region event"
+      State: "ENABLED"
+      EventPattern:
+        source:
+          - aws.s3
+        detail:
+          eventSource:
+            - s3.amazonaws.com
+          eventName:
+            - CopyObject
+            - PutObject
+            - CompleteMultipartUpload
+            - DeleteObject
+          requestParameters:
+            bucketName:
+              - !Ref pBucketName
+      Targets:
+        - Arn: !Sub "arn:aws:events:${pApplicationRegion}:${AWS::AccountId}:event-bus/default"
+          RoleArn: !GetAtt rCrossRegionEventBridgeRole.Arn
+          Id: "CrossRegionDefaultEventBus"
+
+  # Cross-region event rule for data lake trigger
+  rCrossAccountEventBridgeRule:
+    Type: AWS::Events::Rule
+    Condition: DeployCrossAccountRule
+    Properties:
+      Description: "Trigger cross account event"
+      State: "ENABLED"
+      EventPattern:
+        source:
+          - aws.s3
+        detail-type:
+          - "Object Created"
+          - "Object Deleted"
+        detail:
+          bucket:
+            name:
+              - !Ref pBucketName
+      Targets:
+        - Arn: !Ref pRoutingQueueArn
+          Id: "DataLakeRoutingQueueTrigger"
+  
+  # Permission to allow the rule to invoke the data lake routing lambda
+  rCrossAccountPermissionForRuleExecuteWorkflowExecutionQueueConsumer:
+    Type: AWS::Lambda::Permission
+    Condition: DeployRuleExecuteDataLakeProcessCrossAccount
+    Properties:
+      FunctionName: !Ref pRoutingQueueArn
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt rCrossAccountEventBridgeRule.Arn
+
+  # Cross-account event policy for data lake trigger
+  rCrossAccountEventBridgePolicy:
+    Type: AWS::Events::EventBusPolicy
+    Condition: DeployCrossAccountEvents
+    Properties:
+      StatementId: !Sub "${pResourcePrefix}-${pTenantName}-crossAccountEventBridgePolicy"
+      EventBusName: default
+      Statement:
+        Effect: "Allow"
+        Principal: 
+          AWS: !Sub "arn:aws:iam::${pBucketAccount}:root"
+        Action: 'events:PutEvents'
+        Resource: !Sub "arn:aws:events:${pApplicationRegion}:${AWS::AccountId}:event-bus/default"
+
+  # Cross-account lambda policy accessing s3
+  rCrossAccountS3RoutingLambdaPolicy:
+    Type: AWS::IAM::Policy
+    Condition: DeployCrossAccountEvents
+    Properties:
+      PolicyName: !Sub "${pResourcePrefix}-${pTenantName}-crossAccountS3Policy"
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - 's3:GetObject'
+            Resource: 
+              - !Sub "arn:aws:s3:::${pBucketName}"
+              - !Sub "arn:aws:s3:::${pBucketName}/*"
+          - Effect: Allow
+            Action:
+              - 'kms:Decrypt'
+            Resource: 
+              - !Sub "arn:aws:kms:*:${pBucketAccount}:key/*"
+      Roles: 
+        - !Ref pStageARoleName
+
+  ###################################
+  ###            SNS              ###
+  ###################################
+
+  rSnsTopic:
+    Type: 'AWS::SNS::Topic'
+    Condition: DeploySnsTopic
+    Properties:
+      TopicName: !Sub "${pResourcePrefix}-wfm-SNSTopic-${pTenantName}"
+      KmsMasterKeyId: !Ref pSnsKeyId
+
+Outputs:
+  CrossAccountApiTemplateUrl:
+    Condition: DeployApiInvokePolicyCrossAccount
+    Value: !Sub "${pTemplateUrl}/cross-account/${pRedRoomAccountId}/wfm/cross-account-wfm-${pTenantName}.json"
+  CrossAccountDataLakeTemplateUrl:
+    Condition: DeployCrossAccountEvents
+    Value: !Sub "${pTemplateUrl}/cross-account/${pBucketAccount}/data-lake/cross-account-data-lake-${pTenantName}.json"
