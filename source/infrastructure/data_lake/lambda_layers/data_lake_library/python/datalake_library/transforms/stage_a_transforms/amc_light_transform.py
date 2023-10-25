@@ -6,10 +6,6 @@
 # where a JSON file is downloaded from RAW to /tmp
 # then parsed before being re-uploaded to STAGE
 #######################################################
-# License: Apache 2.0
-#######################################################
-# Author: jaidi
-#######################################################
 
 import awswrangler as wr
 import re

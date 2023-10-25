@@ -575,7 +575,7 @@ class SDLFHeavyTransform(Construct):
             ]
         )
 
-        sm_b = sfn.CfnStateMachine(
+        self.sm_b = sfn.CfnStateMachine(
             self,
             'sdlf-heavy-sm-b',
             role_arn=sfn_role.role_arn,
@@ -597,7 +597,7 @@ class SDLFHeavyTransform(Construct):
             "sdlf-heavy-sm-b-arn",
             parameter_name=f"/{self.resource_prefix}/SM/{self.team}/{self.pipeline}StageBSM",
             simple_name=True,
-            string_value=sm_b.attr_arn,
+            string_value=self.sm_b.attr_arn,
         )
 
     def _suppress_cfn_nag_warnings(self):

@@ -622,7 +622,7 @@ class SDLFLightTransform(Construct):
             ]
         )
 
-        sm_a = sfn.CfnStateMachine(
+        self.sm_a = sfn.CfnStateMachine(
             self,
             'sdlf-light-sm-a',
             role_arn=sfn_role.role_arn,
@@ -644,7 +644,7 @@ class SDLFLightTransform(Construct):
             "sdlf-light-sm-a-arn",
             parameter_name=f"/{self.resource_prefix}/SM/{self.team}/{self.pipeline}StageASM",
             simple_name=True,
-            string_value=sm_a.attr_arn,
+            string_value=self.sm_a.attr_arn,
         )
 
     def _suppress_cfn_nag_warnings(self):

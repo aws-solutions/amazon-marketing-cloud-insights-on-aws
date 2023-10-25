@@ -24,6 +24,8 @@ class UserIam(Construct):
             wfm_resources,
             pmn_resources,
             foundations_resources,
+            insights_pipeline_resources,
+            amc_dataset_resources,
             creating_resources_condition
     ) -> None:
         super().__init__(scope, id)
@@ -34,6 +36,8 @@ class UserIam(Construct):
         self._pmn_resources = pmn_resources
         self._foundations_resources = foundations_resources
         self._resource_prefix = Aws.STACK_NAME
+        self._insights_pipeline_resources = insights_pipeline_resources
+        self._amc_dataset_resources = amc_dataset_resources
         self._creating_resources_condition = creating_resources_condition
 
         # Apply condition to resources in Construct
@@ -82,13 +86,16 @@ class UserIam(Construct):
                 "SOLUTION_ID": self.node.try_get_context("SOLUTION_ID"),
                 "SOLUTION_VERSION": self.node.try_get_context("SOLUTION_VERSION"),
                 "STACK_NAME": Aws.STACK_NAME,
+                "APPLICATION_REGION": Aws.REGION,
                 "APPLICATION_ACCOUNT": Aws.ACCOUNT_ID,
-                "SAGEMAKER_NOTEBOOK": f"arn:aws:sagemaker:{Aws.REGION}:{Aws.ACCOUNT_ID}:notebook-instance/{Aws.STACK_NAME}-{self._pmn_resources.notebook_instance.attr_notebook_instance_name}",
+                "SAGEMAKER_NOTEBOOK": f"arn:aws:sagemaker:{Aws.REGION}:{Aws.ACCOUNT_ID}:notebook-instance/{self._pmn_resources.notebook_instance.attr_notebook_instance_name}",
                 "SAGEMAKER_NOTEBOOK_LC": f"arn:aws:sagemaker:{Aws.REGION}:{Aws.ACCOUNT_ID}:notebook-instance-lifecycle-config/{self._pmn_resources.sagemaker_lifecycle_config.attr_notebook_instance_lifecycle_config_name}",
-                "TPS_INITIALIZE_SM": self._tps_resources._sm.attr_arn,
-                "WFM_WORKFLOWS_SM": self._wfm_resources.statemachine_workflows_sm.state_machine_arn,
-                "WFM_WORKFLOW_EXECUTION_SM": self._wfm_resources.statemachine_workflow_executions_sm.state_machine_arn,
                 "DATALAKE_CUSTOMER_TABLE": self._foundations_resources.customer_config_table.table_arn,
+                "TPS_INITIALIZE_SM_NAME": self._tps_resources._sm.attr_name,
+                "WFM_WORKFLOWS_SM_NAME": self._wfm_resources.statemachine_workflows_sm.state_machine_name,
+                "WFM_WORKFLOW_EXECUTION_SM_NAME": self._wfm_resources.statemachine_workflow_executions_sm.state_machine_name,
+                "STAGE_A_TRANSFORM_SM_NAME": self._insights_pipeline_resources._stage_a_transform.sm_a.attr_name,
+                "STAGE_B_TRANSFORM_SM_NAME": self._insights_pipeline_resources._stage_b_transform.sm_b.attr_name,
                 "WFM_CUSTOMER_TABLE": self._wfm_resources.dynamodb_customer_config_table.table_arn,
                 "WFM_WORKFLOWS_TABLE": self._wfm_resources.dynamodb_workflows_table.table_arn,
                 "WFM_WORKFLOW_EXECUTION_TABLE": self._wfm_resources.dynamodb_execution_status_table.table_arn,
@@ -110,7 +117,12 @@ class UserIam(Construct):
                 "STAGE_BUCKET_KEY": self._foundations_resources.stage_bucket_key.key_arn,
                 "ATHENA_BUCKET": self._foundations_resources.athena_bucket.bucket_arn,
                 "ATHENA_BUCKET_KEY": self._foundations_resources.athena_bucket_key.key_arn,
-                "LAKE_FORMATION_CATALOG": f"arn:aws:lakeformation:{Aws.REGION}:{Aws.ACCOUNT_ID}:catalog:{Aws.ACCOUNT_ID}"
+                "LAKE_FORMATION_CATALOG": f"arn:aws:lakeformation:{Aws.REGION}:{Aws.ACCOUNT_ID}:catalog:{Aws.ACCOUNT_ID}",
+                "OCTAGON_DATASETS_TABLE_KEY": self._foundations_resources.datasets.encryption_key.key_arn,
+                "OCTAGON_OBJECT_METADATA_TABLE_KEY": self._foundations_resources.object_metadata.encryption_key.key_arn,
+                "OCTAGON_PIPELINE_EXECUTION_TABLE_KEY": self._foundations_resources.peh.encryption_key.key_arn,
+                "OCTAGON_PIPELINES_TABLE_KEY": self._foundations_resources.pipelines.encryption_key.key_arn,
+                "GLUE_JOB_NAME": self._amc_dataset_resources.job.name
             },
             layers=[
                 PowertoolsLayer.get_or_create(self),

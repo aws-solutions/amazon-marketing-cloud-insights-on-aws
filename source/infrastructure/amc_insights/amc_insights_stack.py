@@ -223,6 +223,8 @@ class AMCInsightsStack(SolutionStack):
                 wfm_resources=wfm_construct,
                 pmn_resources=pmn_construct,
                 foundations_resources=foundations_construct,
+                insights_pipeline_resources=insights_pipeline_construct,
+                amc_dataset_resources=amc_dataset_construct,
                 creating_resources_condition=self._is_deplopying_full_app_condition
                 )
 

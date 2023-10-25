@@ -227,7 +227,7 @@ class SDLFDatasetConstruct(Construct):
         )
 
     def _create_sdlf_stage_b_glue_job(self) -> None:
-        job: CfnJob = CfnJob(
+        self.job: CfnJob = CfnJob(
             self,
             "sdlf-heavy-transform-glue-job",
             name=f"{self._resource_prefix}-{self._team}-{self._dataset}-glue-job",
@@ -256,7 +256,7 @@ class SDLFDatasetConstruct(Construct):
             f"amc-heavy-transform-{self._team}-{self._dataset}-job-name",
             parameter_name=f"/{self._resource_prefix}/Glue/{self._team}/{self._dataset}/SDLFHeavyTransformJobName",
             simple_name=True,
-            string_value=job.name,  # type: ignore
+            string_value=self.job.name,  # type: ignore
         )
 
     def _create_glue_database(self) -> None:
