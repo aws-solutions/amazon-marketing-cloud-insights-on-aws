@@ -139,7 +139,7 @@ class Utils:
 
     def process_parameter_functions(
             self,
-            parameter_value: str
+            parameter_value
     ) -> str:
         """
         Replaces values that have function names such as NOW() TODAY() LASTDAYOFOFFSETMONTH() FIRSTDAYOFOFFSETMONTH() FIFTEENTHDAYOFOFFSETMONTH()
@@ -156,41 +156,42 @@ class Utils:
             parameter value will be returned unchanged
 
         """
-        if parameter_value.upper() == 'NOW()':
-            return dt.datetime.today().strftime('%Y-%m-%dT%H:%M:%S')
+        if isinstance(parameter_value, str):
+            if parameter_value.upper() == 'NOW()':
+                return dt.datetime.today().strftime('%Y-%m-%dT%H:%M:%S')
 
-        if "TODAY(" in parameter_value.upper():
-            if parameter_value.upper() == "TODAY()":
-                return self.get_current_date_with_offset(0)
-            else:
-                return self.get_current_date_with_offset(self.get_offset_value(parameter_value))
+            if "TODAY(" in parameter_value.upper():
+                if parameter_value.upper() == "TODAY()":
+                    return self.get_current_date_with_offset(0)
+                else:
+                    return self.get_current_date_with_offset(self.get_offset_value(parameter_value))
 
-        if "LASTDAYOFOFFSETMONTH(" in parameter_value.upper():
-            date_with_month_offset = self.get_current_date_with_month_offset(
-                self.get_offset_value(parameter_value))
-            last_day_of_previous_month = self.get_last_day_of_month(
-                date_with_month_offset)
-            return_value = dt.datetime(date_with_month_offset.year, date_with_month_offset.month,
-                                       last_day_of_previous_month,
-                                       date_with_month_offset.hour, date_with_month_offset.minute).strftime(
-                '%Y-%m-%dT00:00:00')
-            return return_value
+            if "LASTDAYOFOFFSETMONTH(" in parameter_value.upper():
+                date_with_month_offset = self.get_current_date_with_month_offset(
+                    self.get_offset_value(parameter_value))
+                last_day_of_previous_month = self.get_last_day_of_month(
+                    date_with_month_offset)
+                return_value = dt.datetime(date_with_month_offset.year, date_with_month_offset.month,
+                                        last_day_of_previous_month,
+                                        date_with_month_offset.hour, date_with_month_offset.minute).strftime(
+                    '%Y-%m-%dT00:00:00')
+                return return_value
 
-        if "FIRSTDAYOFOFFSETMONTH(" in parameter_value.upper():
-            date_with_month_offset = self.get_current_date_with_month_offset(
-                self.get_offset_value(parameter_value))
-            return_value = dt.datetime(date_with_month_offset.year, date_with_month_offset.month, 1,
-                                       date_with_month_offset.hour,
-                                       date_with_month_offset.minute).strftime('%Y-%m-%dT00:00:00')
-            return return_value
+            if "FIRSTDAYOFOFFSETMONTH(" in parameter_value.upper():
+                date_with_month_offset = self.get_current_date_with_month_offset(
+                    self.get_offset_value(parameter_value))
+                return_value = dt.datetime(date_with_month_offset.year, date_with_month_offset.month, 1,
+                                        date_with_month_offset.hour,
+                                        date_with_month_offset.minute).strftime('%Y-%m-%dT00:00:00')
+                return return_value
 
-        if "FIFTEENTHDAYOFOFFSETMONTH(" in parameter_value.upper():
-            date_with_month_offset = self.get_current_date_with_month_offset(
-                self.get_offset_value(parameter_value))
-            return_value = dt.datetime(date_with_month_offset.year, date_with_month_offset.month, 15,
-                                       date_with_month_offset.hour,
-                                       date_with_month_offset.minute).strftime('%Y-%m-%dT00:00:00')
-            return return_value
+            if "FIFTEENTHDAYOFOFFSETMONTH(" in parameter_value.upper():
+                date_with_month_offset = self.get_current_date_with_month_offset(
+                    self.get_offset_value(parameter_value))
+                return_value = dt.datetime(date_with_month_offset.year, date_with_month_offset.month, 15,
+                                        date_with_month_offset.hour,
+                                        date_with_month_offset.minute).strftime('%Y-%m-%dT00:00:00')
+                return return_value
         # if no conditions are met, return the parameter unchanged
         return parameter_value
 

@@ -11,12 +11,15 @@ logger = Logger(service='Sync user roles to artifacts bucket', level="INFO")
 helper = CfnResource()
 
 STACK_NAME = os.environ['STACK_NAME']
+APPLICATION_REGION = os.environ['APPLICATION_REGION']
 APPLICATION_ACCOUNT = os.environ['APPLICATION_ACCOUNT']
 SAGEMAKER_NOTEBOOK = os.environ['SAGEMAKER_NOTEBOOK']
 SAGEMAKER_NOTEBOOK_LC = os.environ['SAGEMAKER_NOTEBOOK_LC']
-TPS_INITIALIZE_SM = os.environ['TPS_INITIALIZE_SM']
-WFM_WORKFLOWS_SM = os.environ['WFM_WORKFLOWS_SM']
-WFM_WORKFLOW_EXECUTION_SM = os.environ['WFM_WORKFLOW_EXECUTION_SM']
+TPS_INITIALIZE_SM_NAME = os.environ['TPS_INITIALIZE_SM_NAME']
+WFM_WORKFLOWS_SM_NAME = os.environ['WFM_WORKFLOWS_SM_NAME']
+WFM_WORKFLOW_EXECUTION_SM_NAME = os.environ['WFM_WORKFLOW_EXECUTION_SM_NAME']
+STAGE_A_TRANSFORM_SM_NAME = os.environ['STAGE_A_TRANSFORM_SM_NAME']
+STAGE_B_TRANSFORM_SM_NAME = os.environ['STAGE_B_TRANSFORM_SM_NAME']
 DATALAKE_CUSTOMER_TABLE = os.environ['DATALAKE_CUSTOMER_TABLE']
 WFM_CUSTOMER_TABLE = os.environ['WFM_CUSTOMER_TABLE']
 WFM_WORKFLOWS_TABLE = os.environ['WFM_WORKFLOWS_TABLE']
@@ -40,6 +43,11 @@ STAGE_BUCKET_KEY = os.environ['STAGE_BUCKET_KEY']
 ATHENA_BUCKET = os.environ['ATHENA_BUCKET']
 ATHENA_BUCKET_KEY = os.environ['ATHENA_BUCKET_KEY']
 LAKE_FORMATION_CATALOG = os.environ['LAKE_FORMATION_CATALOG']
+OCTAGON_DATASETS_TABLE_KEY = os.environ['OCTAGON_DATASETS_TABLE_KEY']
+OCTAGON_OBJECT_METADATA_TABLE_KEY = os.environ['OCTAGON_OBJECT_METADATA_TABLE_KEY']
+OCTAGON_PIPELINE_EXECUTION_TABLE_KEY = os.environ['OCTAGON_PIPELINE_EXECUTION_TABLE_KEY']
+OCTAGON_PIPELINES_TABLE_KEY = os.environ['OCTAGON_PIPELINES_TABLE_KEY']
+GLUE_JOB_NAME = os.environ['GLUE_JOB_NAME']
 
 FILE_NAME = 'IAM_POLICY_OPERATE.json'
 IAM_POLICY_TEMPLATE = {
@@ -48,11 +56,29 @@ IAM_POLICY_TEMPLATE = {
         {
             "Effect": "Allow",
             "Action": [
+                "glue:SearchTables",
+                "glue:Get*",
+                "athena:ListNamedQueries",
+                "athena:GetWorkGroup",
+                "athena:StartQueryExecution",
+                "athena:GetQueryExecution",
+                "athena:GetQueryResults",
+                "athena:ListQueryExecutions",
+                "states:ListStateMachines",
+                "states:DescribeStateMachine",
+                "logs:DescribeLogGroups",
+                "lambda:ListFunctions",
+                "dynamodb:ListTables",
+                "dynamodb:DescribeTable",
+                "iam:ListRoles",
+                "iam:ListUsers",
+                "lambda:GetAccountSettings",
+                "events:Describe*",
+                "s3:ListAllMyBuckets",
+                "events:List*",
                 "sagemaker:ListNotebookInstances"
             ],
-            "Resource": [
-                "*"
-            ]
+            "Resource": "*"
         },
         {
             "Effect": "Allow",
@@ -67,31 +93,19 @@ IAM_POLICY_TEMPLATE = {
         {
             "Effect": "Allow",
             "Action": [
-                "states:ListStateMachines",
-                "states:DescribeStateMachine"
-            ],
-            "Resource": [
-                "*"
-            ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
                 "states:*"
             ],
             "Resource": [
-                f"{TPS_INITIALIZE_SM}:*",
-                f"{WFM_WORKFLOWS_SM}:*",
-                f"{WFM_WORKFLOW_EXECUTION_SM}:*"
-            ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "s3:ListAllMyBuckets"
-            ],
-            "Resource": [
-                "*"
+                f"arn:aws:states:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:stateMachine:{TPS_INITIALIZE_SM_NAME}*",
+                f"arn:aws:states:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:execution:{TPS_INITIALIZE_SM_NAME}*",
+                f"arn:aws:states:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:stateMachine:{WFM_WORKFLOWS_SM_NAME}*",
+                f"arn:aws:states:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:execution:{WFM_WORKFLOWS_SM_NAME}*",
+                f"arn:aws:states:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:stateMachine:{WFM_WORKFLOW_EXECUTION_SM_NAME}*",
+                f"arn:aws:states:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:execution:{WFM_WORKFLOW_EXECUTION_SM_NAME}*",
+                f"arn:aws:states:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:stateMachine:{STAGE_A_TRANSFORM_SM_NAME}*",
+                f"arn:aws:states:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:execution:{STAGE_A_TRANSFORM_SM_NAME}*",
+                f"arn:aws:states:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:stateMachine:{STAGE_B_TRANSFORM_SM_NAME}*",
+                f"arn:aws:states:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:execution:{STAGE_B_TRANSFORM_SM_NAME}*"
             ]
         },
         {
@@ -115,34 +129,17 @@ IAM_POLICY_TEMPLATE = {
         {
             "Effect": "Allow",
             "Action": [
-                "dynamodb:ListTables",
-                "dynamodb:DescribeTable"
-            ],
-            "Resource": [
-                "*"
-            ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
                 "dynamodb:*"
             ],
             "Resource": [
-                TPS_CUSTOMER_TABLE,
                 f"{TPS_CUSTOMER_TABLE}*",
-                WFM_CUSTOMER_TABLE,
                 f"{WFM_CUSTOMER_TABLE}*",
-                WFM_WORKFLOWS_TABLE,
                 f"{WFM_WORKFLOWS_TABLE}*",
-                DATALAKE_CUSTOMER_TABLE,
+                f"{WFM_WORKFLOW_EXECUTION_TABLE}*",
                 f"{DATALAKE_CUSTOMER_TABLE}*",
-                OCTAGON_DATASETS_TABLE,
                 f"{OCTAGON_DATASETS_TABLE}*",
-                OCTAGON_OBJECT_METADATA_TABLE,
                 f"{OCTAGON_OBJECT_METADATA_TABLE}*",
-                OCTAGON_PIPELINE_EXECUTION_TABLE,
                 f"{OCTAGON_PIPELINE_EXECUTION_TABLE}*",
-                OCTAGON_PIPELINE_TABLE,
                 f"{OCTAGON_PIPELINE_TABLE}*",
             ]
         },
@@ -159,17 +156,11 @@ IAM_POLICY_TEMPLATE = {
                 STAGE_BUCKET_KEY,
                 ATHENA_BUCKET_KEY,
                 LOGGING_BUCKET_KEY,
-                ARTIFACTS_BUCKET_KEY
-            ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "events:List*",
-                "events:Describe*"
-            ],
-            "Resource": [
-                "*"
+                ARTIFACTS_BUCKET_KEY,
+                OCTAGON_DATASETS_TABLE_KEY,
+                OCTAGON_OBJECT_METADATA_TABLE_KEY,
+                OCTAGON_PIPELINE_EXECUTION_TABLE_KEY,
+                OCTAGON_PIPELINES_TABLE_KEY
             ]
         },
         {
@@ -185,29 +176,10 @@ IAM_POLICY_TEMPLATE = {
         {
             "Effect": "Allow",
             "Action": [
-                "lambda:GetAccountSettings",
-                "lambda:ListFunctions"
-            ],
-            "Resource": [
-                "*"
-            ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
                 "lambda:*"
             ],
             "Resource": [
                 f"arn:aws:lambda:*:{APPLICATION_ACCOUNT}:function:{STACK_NAME}*"
-            ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "logs:DescribeLogGroups"
-            ],
-            "Resource": [
-                "*"
             ]
         },
         {
@@ -222,21 +194,7 @@ IAM_POLICY_TEMPLATE = {
         {
             "Effect": "Allow",
             "Action": [
-                "iam:ListRoles",
-                "iam:ListUsers"
-            ],
-            "Resource": [
-                "*"
-            ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "lakeformation:PutDataLakeSettings",
-                "lakeformation:GetDataLakeSettings",
-                "lakeformation:ListPermissions",
-                "lakeformation:ListLFTags",
-                "lakeformation:BatchGrantPermissions"
+                "lakeformation:*"
             ],
             "Resource": [
                 LAKE_FORMATION_CATALOG
@@ -245,27 +203,19 @@ IAM_POLICY_TEMPLATE = {
         {
             "Effect": "Allow",
             "Action": [
-                "glue:GetDatabases",
-                "glue:SearchTables",
-                "glue:GetTables",
-                "glue:GetDatabase"
+                "cloudformation:*"
             ],
             "Resource": [
-                "*"
+                f"arn:aws:cloudformation:*:{APPLICATION_ACCOUNT}:stack/{STACK_NAME}*"
             ]
         },
         {
             "Effect": "Allow",
             "Action": [
-                "athena:GetWorkGroup",
-                "athena:StartQueryExecution",
-                "athena:GetQueryExecution",
-                "athena:GetQueryResults",
-                "athena:ListQueryExecutions",
-                "athena:ListNamedQueries"
+                "glue:*"
             ],
             "Resource": [
-                "*"
+                f"arn:aws:glue:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:job/{GLUE_JOB_NAME}"
             ]
         }
     ]

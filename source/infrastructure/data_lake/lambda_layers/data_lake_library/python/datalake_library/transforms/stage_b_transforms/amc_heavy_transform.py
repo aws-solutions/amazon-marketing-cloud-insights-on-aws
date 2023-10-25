@@ -6,10 +6,6 @@
 # where a number of CSV files are dowloaded from
 # Stage bucket and then submitted to a Glue Job
 #######################################################
-# License: Apache 2.0
-#######################################################
-# Author: jaidi
-#######################################################
 
 #######################################################
 # Import section
