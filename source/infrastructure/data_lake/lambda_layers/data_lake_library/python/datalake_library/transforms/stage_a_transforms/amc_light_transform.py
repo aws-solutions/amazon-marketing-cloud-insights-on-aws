@@ -55,7 +55,7 @@ class CustomTransform():
         logger.info('file_last_modified: {}'.format(file_last_modified))
 
         # initialize our variables extracted from the key:
-        key_team = key_dataset = workflow_name = schedule_frequency = file_name = file_year = file_month = file_day = file_hour = file_minute = file_second = file_millisecond = file_basename = file_extension = file_version = ''
+        key_team = key_dataset = workflow_name = schedule_frequency = file_name = file_year = file_month = file_day = file_hour = file_minute = file_second = file_millisecond = file_basename = file_extension = file_version = file_timestamp = ''
 
         processed_keys = []
 
@@ -80,11 +80,13 @@ class CustomTransform():
 
         if file_name_with_time_search_results is not None:
             file_year, file_month, file_day, file_hour, file_minute, file_second, file_millisecond, file_basename, file_extension = file_name_with_time_search_results.groups()
+            file_timestamp = f"{file_year}-{file_month}-{file_day}T{file_hour}-{file_minute}-{file_second}-{file_millisecond}Z" 
         else:
             # Check to see if the key matches the pattern with date only e.g. workflow=standard_geo_date_summary_V3/schedule=weekly/2020-02-04-standard_geo_date_summary_V3-ver2.csv
             file_name_date_only_search_results = re.match("(\d{4})-(\d{2})-(\d{2})-([^.]*)\.(.*)", file_name)
             if file_name_date_only_search_results is not None:
                 file_year, file_month, file_day, file_basename, file_extension = file_name_date_only_search_results.groups()
+                file_timestamp = f"{file_year}-{file_month}-{file_day}"
 
         # check to see if we have a version appended to the end fo the file basename
         version_results = re.match(".*-(ver\d)", file_basename)
@@ -128,14 +130,14 @@ class CustomTransform():
             # ### OUTPUT_PATH FOR OOB_REPORTS
             table_prefix = get_table_prefix(workflow_name, oob_reports, prefix)
 
-            output_path = get_output_path(file_version,table_prefix,workflow_name,schedule_frequency,customer_hash_key,file_year,file_month,file_last_modified,file_basename,file_extension)
+            output_path = get_output_path(file_version,table_prefix,workflow_name,schedule_frequency,customer_hash_key,file_year,file_month,file_last_modified,file_timestamp,file_basename,file_extension)
 
             logger.info("outputPath : " + output_path)
 
             output_path = os.path.splitext(output_path)[0].rsplit('/', 1)[0].split('/')
             output_path[0] = wr.catalog.sanitize_table_name(output_path[0])
             output_path = '/'.join(output_path)
-            output_path = '{}/{}.{}'.format(output_path, file_basename, file_extension)
+            output_path = '{}/{}-{}.{}'.format(output_path, file_timestamp, file_basename, file_extension)
 
             # Uploading file to Stage bucket at appropriate path
             # IMPORTANT: Build the output s3_path without the s3://stage-bucket/
@@ -162,6 +164,7 @@ class CustomTransform():
                 'fileBasename': file_basename,
                 'fileExtension': file_extension,
                 'fileVersion': file_version,
+                'fileTimestamp': file_timestamp,
                 'partitionedPath': output_path.rsplit('/', 1)[0]
             }
 
@@ -197,10 +200,10 @@ def get_oob_reports(response):
 
     return oob_reports
 
-def get_output_path(file_version, table_prefix,workflow_name,schedule_frequency,customer_hash_key,file_year,file_month,file_last_modified,file_basename,file_extension):
+def get_output_path(file_version, table_prefix,workflow_name,schedule_frequency,customer_hash_key,file_year,file_month,file_last_modified,file_timestamp, file_basename,file_extension):
     if file_version != '':
-        output_path = "{}_{}_{}_{}/customer_hash={}/export_year={}/export_month={}/file_last_modified={}/{}.{}".format(table_prefix,workflow_name,schedule_frequency,file_version,customer_hash_key,file_year,file_month,file_last_modified,file_basename,file_extension)
+        output_path = "{}_{}_{}_{}/customer_hash={}/export_year={}/export_month={}/file_last_modified={}/{}-{}.{}".format(table_prefix,workflow_name,schedule_frequency,file_version,customer_hash_key,file_year,file_month,file_last_modified,file_timestamp,file_basename,file_extension)
     else:
-        output_path = "{}_{}_{}/customer_hash={}/export_year={}/export_month={}/file_last_modified={}/{}.{}".format(table_prefix,workflow_name,schedule_frequency,customer_hash_key,file_year,file_month,file_last_modified,file_basename,file_extension)
+        output_path = "{}_{}_{}/customer_hash={}/export_year={}/export_month={}/file_last_modified={}/{}-{}.{}".format(table_prefix,workflow_name,schedule_frequency,customer_hash_key,file_year,file_month,file_last_modified,file_timestamp,file_basename,file_extension)
     
     return output_path

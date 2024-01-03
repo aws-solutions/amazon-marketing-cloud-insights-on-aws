@@ -150,7 +150,7 @@ def test_add_tags_lf(_mock_imports):
 
         add_tags_lf(cust_hash_tag_dict=cust_hash_tag_dict, database_name=database_name, table_name=table_name)
         assert "some_tag_key" == client.get_lf_tag(TagKey=list(cust_hash_tag_dict.keys())[0])["TagKey"]
-        assert ['some_tag_value'] == client.get_lf_tag(TagKey=list(cust_hash_tag_dict.keys())[0])["TagValues"]
+        assert ['some_tag_value', 'some_tag_value'] == client.get_lf_tag(TagKey=list(cust_hash_tag_dict.keys())[0])["TagValues"]
 
 
 @mock_glue
@@ -293,7 +293,7 @@ def test_process_files(_mock_imports, fake_glue_table_attrs):
     s3_object.put(Body=json.dumps({
         "test": "tester",
     }))
-    s3_object.metadata.update({"partitionedpath": "somepath","filebasename": "somefilbase","workflowname": "someworkflowname",})
+    s3_object.metadata.update({"partitionedpath": "somepath","filebasename": "somefilbase","workflowname": "someworkflowname", "filetimestamp" : "sometimestamp"})
     s3_object.copy_from(CopySource={'Bucket':'test_bucket', 'Key':'test_key'}, Metadata=s3_object.metadata, MetadataDirective='REPLACE')
 
     key_policy = {

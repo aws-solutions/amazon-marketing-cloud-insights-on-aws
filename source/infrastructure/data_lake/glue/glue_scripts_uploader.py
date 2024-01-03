@@ -118,7 +118,8 @@ class GlueScriptsUploader(Construct):
             properties={
                 "artifacts_bucket_name": self._solution_buckets.artifacts_bucket.bucket_name,
                 "artifacts_object_key": self._glue_script_path,
-                "glue_script_file": self._glue_script_local_file_path
+                "glue_script_file": self._glue_script_local_file_path,
+                "amc_dataset_version": "2.0.2"
             },
         )
         self._sdlf_heavy_transform_glue_script_custom_resource.node.add_dependency(
