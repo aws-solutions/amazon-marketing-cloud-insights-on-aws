@@ -69,17 +69,29 @@ def apply_handler_env():
     os.environ['ATHENA_BUCKET'] = "test_athena_bucket"
     os.environ['ATHENA_BUCKET_KEY'] = "test_athena_bucket_key"
     os.environ['LAKE_FORMATION_CATALOG'] = "test_lake_formation_catalog"
-
+    os.environ['APPLICATION_REGION'] = "us-east-1"
+    os.environ['TPS_INITIALIZE_SM_NAME'] = "test_sm_name"
+    os.environ['WFM_WORKFLOWS_SM_NAME'] = "test_sm_name"
+    os.environ['WFM_WORKFLOW_EXECUTION_SM_NAME'] = "test_sm_name"
+    os.environ['STAGE_A_TRANSFORM_SM_NAME'] = "test_sm_name"
+    os.environ['STAGE_B_TRANSFORM_SM_NAME'] = "test_sm_name"
+    os.environ['OCTAGON_DATASETS_TABLE_KEY'] = "test_table_key"
+    os.environ['OCTAGON_OBJECT_METADATA_TABLE_KEY'] = "test_table_key"
+    os.environ['OCTAGON_PIPELINE_EXECUTION_TABLE_KEY'] = "test_table_key"
+    os.environ['OCTAGON_PIPELINES_TABLE_KEY'] = "test_table_key"
+    os.environ['GLUE_JOB_NAME'] = "test_glue_name"
 
 def test_globals():
     from amc_insights.custom_resource.user_iam.lambdas.create_user_iam import (
         FILE_NAME, IAM_POLICY_TEMPLATE, STACK_NAME, APPLICATION_ACCOUNT,
-        SAGEMAKER_NOTEBOOK, SAGEMAKER_NOTEBOOK_LC, TPS_INITIALIZE_SM, WFM_WORKFLOWS_SM,
-        WFM_WORKFLOW_EXECUTION_SM, DATALAKE_CUSTOMER_TABLE, WFM_CUSTOMER_TABLE, WFM_WORKFLOWS_TABLE,
+        SAGEMAKER_NOTEBOOK, SAGEMAKER_NOTEBOOK_LC, DATALAKE_CUSTOMER_TABLE, WFM_CUSTOMER_TABLE, WFM_WORKFLOWS_TABLE,
         WFM_WORKFLOW_EXECUTION_TABLE, TPS_CUSTOMER_TABLE, OCTAGON_DATASETS_TABLE, OCTAGON_OBJECT_METADATA_TABLE,
         OCTAGON_PIPELINE_EXECUTION_TABLE, OCTAGON_PIPELINE_TABLE, DATALAKE_CUSTOMER_TABLE_KEY, DATALAKE_CUSTOMER_TABLE_KEY,
         WFM_TABLE_KEY, TPS_TABLE_KEY, ARTIFACTS_BUCKET, ARTIFACTS_BUCKET_KEY,LOGGING_BUCKET, LOGGING_BUCKET_KEY, RAW_BUCKET,
-        RAW_BUCKET_KEY, STAGE_BUCKET, STAGE_BUCKET_KEY, ATHENA_BUCKET, ATHENA_BUCKET_KEY, LAKE_FORMATION_CATALOG
+        RAW_BUCKET_KEY, STAGE_BUCKET, STAGE_BUCKET_KEY, ATHENA_BUCKET, ATHENA_BUCKET_KEY, LAKE_FORMATION_CATALOG,
+        APPLICATION_REGION, TPS_INITIALIZE_SM_NAME, WFM_WORKFLOWS_SM_NAME, WFM_WORKFLOW_EXECUTION_SM_NAME, STAGE_A_TRANSFORM_SM_NAME, 
+        STAGE_B_TRANSFORM_SM_NAME, OCTAGON_DATASETS_TABLE_KEY, OCTAGON_OBJECT_METADATA_TABLE_KEY, OCTAGON_PIPELINE_EXECUTION_TABLE_KEY,
+        OCTAGON_PIPELINES_TABLE_KEY, GLUE_JOB_NAME
     )
 
     assert FILE_NAME == 'IAM_POLICY_OPERATE.json'
@@ -87,9 +99,6 @@ def test_globals():
     assert APPLICATION_ACCOUNT == os.environ['APPLICATION_ACCOUNT']
     assert SAGEMAKER_NOTEBOOK == os.environ['SAGEMAKER_NOTEBOOK']
     assert SAGEMAKER_NOTEBOOK_LC == os.environ['SAGEMAKER_NOTEBOOK_LC']
-    assert TPS_INITIALIZE_SM == os.environ['TPS_INITIALIZE_SM']
-    assert WFM_WORKFLOWS_SM == os.environ['WFM_WORKFLOWS_SM']
-    assert WFM_WORKFLOW_EXECUTION_SM == os.environ['WFM_WORKFLOW_EXECUTION_SM']
     assert DATALAKE_CUSTOMER_TABLE == os.environ['DATALAKE_CUSTOMER_TABLE']
     assert WFM_CUSTOMER_TABLE == os.environ['WFM_CUSTOMER_TABLE']
     assert WFM_WORKFLOWS_TABLE == os.environ['WFM_WORKFLOWS_TABLE']
@@ -120,11 +129,29 @@ def test_globals():
             {
                 "Effect": "Allow",
                 "Action": [
+                    "glue:SearchTables",
+                    "glue:Get*",
+                    "athena:ListNamedQueries",
+                    "athena:GetWorkGroup",
+                    "athena:StartQueryExecution",
+                    "athena:GetQueryExecution",
+                    "athena:GetQueryResults",
+                    "athena:ListQueryExecutions",
+                    "states:ListStateMachines",
+                    "states:DescribeStateMachine",
+                    "logs:DescribeLogGroups",
+                    "lambda:ListFunctions",
+                    "dynamodb:ListTables",
+                    "dynamodb:DescribeTable",
+                    "iam:ListRoles",
+                    "iam:ListUsers",
+                    "lambda:GetAccountSettings",
+                    "events:Describe*",
+                    "s3:ListAllMyBuckets",
+                    "events:List*",
                     "sagemaker:ListNotebookInstances"
                 ],
-                "Resource": [
-                    "*"
-                ]
+                "Resource": "*"
             },
             {
                 "Effect": "Allow",
@@ -139,31 +166,19 @@ def test_globals():
             {
                 "Effect": "Allow",
                 "Action": [
-                    "states:ListStateMachines",
-                    "states:DescribeStateMachine"
-                ],
-                "Resource": [
-                    "*"
-                ]
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
                     "states:*"
                 ],
                 "Resource": [
-                    f"{TPS_INITIALIZE_SM}:*",
-                    f"{WFM_WORKFLOWS_SM}:*",
-                    f"{WFM_WORKFLOW_EXECUTION_SM}:*"
-                ]
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "s3:ListAllMyBuckets"
-                ],
-                "Resource": [
-                    "*"
+                    f"arn:aws:states:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:stateMachine:{TPS_INITIALIZE_SM_NAME}*",
+                    f"arn:aws:states:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:execution:{TPS_INITIALIZE_SM_NAME}*",
+                    f"arn:aws:states:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:stateMachine:{WFM_WORKFLOWS_SM_NAME}*",
+                    f"arn:aws:states:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:execution:{WFM_WORKFLOWS_SM_NAME}*",
+                    f"arn:aws:states:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:stateMachine:{WFM_WORKFLOW_EXECUTION_SM_NAME}*",
+                    f"arn:aws:states:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:execution:{WFM_WORKFLOW_EXECUTION_SM_NAME}*",
+                    f"arn:aws:states:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:stateMachine:{STAGE_A_TRANSFORM_SM_NAME}*",
+                    f"arn:aws:states:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:execution:{STAGE_A_TRANSFORM_SM_NAME}*",
+                    f"arn:aws:states:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:stateMachine:{STAGE_B_TRANSFORM_SM_NAME}*",
+                    f"arn:aws:states:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:execution:{STAGE_B_TRANSFORM_SM_NAME}*"
                 ]
             },
             {
@@ -187,34 +202,17 @@ def test_globals():
             {
                 "Effect": "Allow",
                 "Action": [
-                    "dynamodb:ListTables",
-                    "dynamodb:DescribeTable"
-                ],
-                "Resource": [
-                    "*"
-                ]
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
                     "dynamodb:*"
                 ],
                 "Resource": [
-                    TPS_CUSTOMER_TABLE,
                     f"{TPS_CUSTOMER_TABLE}*",
-                    WFM_CUSTOMER_TABLE,
                     f"{WFM_CUSTOMER_TABLE}*",
-                    WFM_WORKFLOWS_TABLE,
                     f"{WFM_WORKFLOWS_TABLE}*",
-                    DATALAKE_CUSTOMER_TABLE,
+                    f"{WFM_WORKFLOW_EXECUTION_TABLE}*",
                     f"{DATALAKE_CUSTOMER_TABLE}*",
-                    OCTAGON_DATASETS_TABLE,
                     f"{OCTAGON_DATASETS_TABLE}*",
-                    OCTAGON_OBJECT_METADATA_TABLE,
                     f"{OCTAGON_OBJECT_METADATA_TABLE}*",
-                    OCTAGON_PIPELINE_EXECUTION_TABLE,
                     f"{OCTAGON_PIPELINE_EXECUTION_TABLE}*",
-                    OCTAGON_PIPELINE_TABLE,
                     f"{OCTAGON_PIPELINE_TABLE}*",
                 ]
             },
@@ -231,17 +229,11 @@ def test_globals():
                     STAGE_BUCKET_KEY,
                     ATHENA_BUCKET_KEY,
                     LOGGING_BUCKET_KEY,
-                    ARTIFACTS_BUCKET_KEY
-                ]
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "events:List*",
-                    "events:Describe*"
-                ],
-                "Resource": [
-                    "*"
+                    ARTIFACTS_BUCKET_KEY,
+                    OCTAGON_DATASETS_TABLE_KEY,
+                    OCTAGON_OBJECT_METADATA_TABLE_KEY,
+                    OCTAGON_PIPELINE_EXECUTION_TABLE_KEY,
+                    OCTAGON_PIPELINES_TABLE_KEY
                 ]
             },
             {
@@ -257,29 +249,10 @@ def test_globals():
             {
                 "Effect": "Allow",
                 "Action": [
-                    "lambda:GetAccountSettings",
-                    "lambda:ListFunctions"
-                ],
-                "Resource": [
-                    "*"
-                ]
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
                     "lambda:*"
                 ],
                 "Resource": [
                     f"arn:aws:lambda:*:{APPLICATION_ACCOUNT}:function:{STACK_NAME}*"
-                ]
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "logs:DescribeLogGroups"
-                ],
-                "Resource": [
-                    "*"
                 ]
             },
             {
@@ -294,21 +267,7 @@ def test_globals():
             {
                 "Effect": "Allow",
                 "Action": [
-                    "iam:ListRoles",
-                    "iam:ListUsers"
-                ],
-                "Resource": [
-                    "*"
-                ]
-            },
-            {
-                "Effect": "Allow",
-                "Action": [
-                    "lakeformation:PutDataLakeSettings",
-                    "lakeformation:GetDataLakeSettings",
-                    "lakeformation:ListPermissions",
-                    "lakeformation:ListLFTags",
-                    "lakeformation:BatchGrantPermissions"
+                    "lakeformation:*"
                 ],
                 "Resource": [
                     LAKE_FORMATION_CATALOG
@@ -317,27 +276,19 @@ def test_globals():
             {
                 "Effect": "Allow",
                 "Action": [
-                    "glue:GetDatabases",
-                    "glue:SearchTables",
-                    "glue:GetTables",
-                    "glue:GetDatabase"
+                    "cloudformation:*"
                 ],
                 "Resource": [
-                    "*"
+                    f"arn:aws:cloudformation:*:{APPLICATION_ACCOUNT}:stack/{STACK_NAME}*"
                 ]
             },
             {
                 "Effect": "Allow",
                 "Action": [
-                    "athena:GetWorkGroup",
-                    "athena:StartQueryExecution",
-                    "athena:GetQueryExecution",
-                    "athena:GetQueryResults",
-                    "athena:ListQueryExecutions",
-                    "athena:ListNamedQueries"
+                    "glue:*"
                 ],
                 "Resource": [
-                    "*"
+                    f"arn:aws:glue:{APPLICATION_REGION}:{APPLICATION_ACCOUNT}:job/{GLUE_JOB_NAME}"
                 ]
             }
         ]

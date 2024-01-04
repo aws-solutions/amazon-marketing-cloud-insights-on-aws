@@ -13,13 +13,13 @@ import io
 import re
 import unicodedata
 from pandas.api.types import is_numeric_dtype, is_string_dtype
-from typing import Tuple
 from aws_lambda_powertools import Logger
 
 # create logger
 logger = Logger(service="Glue job for AMC dataset", level='INFO', utc=True)
 
-solution_args = getResolvedOptions(sys.argv, ['SOLUTION_ID', 'SOLUTION_VERSION', 'RESOURCE_PREFIX', 'METRICS_NAMESPACE'])
+solution_args = getResolvedOptions(sys.argv,
+                                   ['SOLUTION_ID', 'SOLUTION_VERSION', 'RESOURCE_PREFIX', 'METRICS_NAMESPACE'])
 solution_id = solution_args['SOLUTION_ID']
 solution_version = solution_args['SOLUTION_VERSION']
 resource_prefix = solution_args['RESOURCE_PREFIX']
@@ -37,6 +37,7 @@ def get_service_resource(service_name):
     amci_boto3_config = Config(**botocore_config_defaults)
     return boto3.resource(service_name, config=amci_boto3_config)
 
+
 print('boto3 version')
 print(boto3.__version__)
 
@@ -45,7 +46,7 @@ s3_resource = get_service_resource('s3')
 s3_client = get_service_client('s3')
 lf_client = get_service_client('lakeformation')
 
-# This map is used to convert Athena datatypes (in upppercase) to pandas Datatypes
+# This map is used to convert Athena datatypes (in uppercase) to pandas Datatypes
 data_type_map = {
     "ARRAY": object
     , "BIGINT": np.int64
@@ -89,18 +90,21 @@ column_datatype_override = {
     ".*_pct[s]*($|_.*)": np.float64,
     "avg($|_.*)|.*_avg[s]*($|_.*)": np.float64,
     "[e]*cpm$|.*_[e]*cpm$|.*_[e]*cpm_.*$": np.float64,
-    ".*_id$": str
+    ".*_id$|.*_asin$": str
 }
 
 exclude_workflow = ['standard_impressions_by_browser_family', 'standard_impressions-by-browser-family']
 
-def get_bucket_and_key_from_s3_uri(s3_path: str):
+
+def get_bucket_and_key_from_s3_uri(s3_path: str) -> (str, str):
     output_bucket, output_key = re.match('s3://([^/]*)/(.*)', s3_path).groups()
     return output_bucket, output_key
+
 
 def athena_sanitize_name(name: str) -> str:
     name = "".join(c for c in unicodedata.normalize("NFD", name) if unicodedata.category(c) != "Mn")  # strip accents
     return re.sub("\W+", "_", name).lower()  # Replacing non alphanumeric characters by underscore
+
 
 def add_partitions(outputfilebasepath, silver_catalog, list_partns, target_table_name):
     partn_values = []
@@ -140,6 +144,7 @@ def get_partition_values(source_file_partitioned_path):
             cust_hash = str(prtns.split("=")[1])
 
     return list_partns, cust_hash
+
 
 def add_tags_lf(cust_hash_tag_dict, database_name, table_name):
     try:
@@ -244,7 +249,6 @@ def create_update_tbl(csvdf, csv_schema, tbl_schema, silver_catalog, target_tabl
             print(resp)
         else:
             print("No change in table")
-
     else:
         print("Table does not exist. Creating new table")
         col_dict = {}
@@ -271,6 +275,10 @@ def create_update_tbl(csvdf, csv_schema, tbl_schema, silver_catalog, target_tabl
             compression='snappy',
             parameters=cust_hash_tag_dict
         )
+
+    # uncomment below line if you want to enable Lake Formation tags
+    # add_tags_lf(cust_hash_tag_dict, silverCatalog, wr.catalog.sanitize_table_name(targetTableName))
+
 
 def check_filtered_row(csvdf):
     csvdf_filtered_rows = csvdf[csvdf.filtered.str.lower() == "true"]
@@ -299,8 +307,82 @@ def check_filtered_row(csvdf):
     logger.info(
         f"input data had {csvdf_filtered_rows.shape[0]} filtered rows and {csvdf_only_unfiltered_rows.shape[0]} unfiltered rows")
 
-    # will be true if there is at least 1 row left in the df after filtered rows are removed
+    # has_unfiltered_rows will be true if there is at least 1 row left in the df after filtered rows are removed
     return csvdf_only_unfiltered_rows.shape[0] > 0
+
+
+def read_schema(target_table_name, silver_catalog, csv_schema, csvdf):
+    table_schema = {}
+    get_table_result = glue_client.get_table(DatabaseName=silver_catalog,
+                                             Name=athena_sanitize_name(target_table_name))
+    logger.info(f"getting schema for table {silver_catalog}.{athena_sanitize_name(target_table_name)}")
+
+    for table_column in get_table_result['Table']['StorageDescriptor']['Columns']:
+        table_schema[table_column['Name']] = table_column['Type']
+        logger.info(f"table schema : {table_column['Name']} : {table_column['Type']}")
+
+    for table_column in get_table_result['Table']['StorageDescriptor']['Columns']:
+        table_schema[table_column['Name']] = table_column['Type']
+
+    # copy the old csv schema to start the new schema
+    new_schema = csv_schema.copy()
+
+    # if the csv schema column matches an existing table schema column, update the csv schema to match match
+    # the table's schema
+    for column in new_schema:
+        if column in table_schema:
+            # look up the datatype from the table in our DataTypeMap (convert the datatype name to uppercase
+            # first for the lookup matching)
+            new_schema[column] = data_type_map[table_schema[column].upper()]
+
+    logger.info(f'csvSchema:{csv_schema}')
+    logger.info(f'newSchema:{new_schema}')
+
+    # convert the CSV dataframe Schema to the new schema that was read from the glue table (if it exists)
+    for c in csvdf.columns:
+        if csvdf[c].dtype != new_schema[c]:
+            logger.info(
+                f'{c} datatype in file {csvdf[c].dtype} does not match datatype in table {new_schema[c]}')
+            try:
+                if new_schema[c] == np.int64:
+                    csvdf[c].fillna(pd.NA, inplace=True)
+                    csvdf[c].replace('nan', pd.NA, inplace=True)
+                    csvdf[c] = csvdf[c].astype('float').astype('Int64')
+                else:
+                    csvdf[c] = csvdf[c].astype(new_schema[c])
+                logger.info(f'casted {c} as {new_schema[c]} to match table')
+                print(f"dtype:{csvdf[c].dtype}")
+                print(f"value is:{csvdf[c]}")
+            except (TypeError, ValueError) as e:
+                logger.info(f'could not cast {c} to {new_schema[c]} to match table: {str(e)}')
+
+    return table_schema
+
+
+def general_schema_conversion(target_table_name, silver_catalog, csvdf):
+    logger.info(
+        f'Caught exception, destination table {silver_catalog}.{target_table_name} does not exist, attempting to '
+        f'cast all numbers to Int64 if possible')
+
+    # If there are blanks in the data integers will be cast to floats which causes inconsistent parquet schema
+    # Convert any numbers to Int64 (as opposed to int64) since Int64 can handle nulls
+    for c in csvdf.select_dtypes(np.number).columns:
+        try:
+            csvdf[c] = csvdf[c].astype('Int64')
+            logger.info(f'casted {c} as Int64')
+        except (TypeError, ValueError) as e:
+            logger.info(f'could not cast {c} to Int64: {str(e)}')
+
+
+def iterate_csvdf_cols(csvdf, only_string_schema, only_nonstring_schema):
+    # Iterate over the text only columns
+    for column in csvdf.columns:
+        if check_override_match(column, csvdf):
+            continue
+        if check_column_type(column=column, only_string_schema=only_string_schema, csvdf=csvdf,
+                             only_nonstring_schema=only_nonstring_schema):
+            continue
+
 
 def check_override_match(column, csvdf):
     # Check to see if the column matched an override suffix to force a datatype rather than deriving it
@@ -310,17 +392,31 @@ def check_override_match(column, csvdf):
         if regex_match:
             override_datatype = column_datatype_override[regex_expression_key]
             if is_numeric_dtype(override_datatype):
-                csvdf[column].fillna(-1, inplace=True)
-            csvdf[column] = csvdf[column].astype(override_datatype)
+                csvdf[column].fillna(pd.NA, inplace=True)
+            csvdf[column] = csvdf[column].astype("string").astype(override_datatype)
             logger.info(
                 f"column {column} matched override regex expression {regex_expression_key} and was casted to {override_datatype}")
             override_matched = True
     return override_matched
 
+
+def check_column_type(column, only_string_schema, csvdf, only_nonstring_schema):
+    if column in only_string_schema:
+        # Explicitly cast string type columns as string
+        csvdf[column] = csvdf[column].astype(str)
+        return True
+        # if the column is derived as a nonstring then we need to try to cast it to the appropriate type with rules
+    if column in only_nonstring_schema:
+        if cast_nonstring_column(only_nonstring_schema=only_nonstring_schema, column=column, csvdf=csvdf):
+            return True
+
+    return False
+
+
 def cast_nonstring_column(only_nonstring_schema, csvdf, column):
     derived_datatype_name = only_nonstring_schema[column]
-    # since we know the column is not a string, fill blanks with -1
-    csvdf[column].fillna(-1, inplace=True)
+    # since we know the column is not a string, fill blanks with null value
+    csvdf[column].fillna(np.nan, inplace=True)
 
     # if the nonstring column is boolean than map to 0 or 1 values before casting to boolean to ensure that
     # false, FALSE, and False end up as 0
@@ -337,14 +433,14 @@ def cast_nonstring_column(only_nonstring_schema, csvdf, column):
     if is_numeric_dtype(only_nonstring_schema[column]):
         # Convert any derived number columns to Int64 if possible
         try:
-            csvdf[column] = csvdf[column].astype('int64')
-            logger.info(f'casted {column} derived as {derived_datatype_name} to int64')
+            csvdf[column] = csvdf[column].astype('Int64')
+            logger.info(f'casted {column} derived as {derived_datatype_name} to Int64')
             # If we cast successfully then go to the next column
             return True
         except (TypeError, ValueError) as e:
             # Log if we are unable to cast to an int64 then note it in the log
             logger.info(
-                f'could not cast {column} derived as {derived_datatype_name} to int64: {str(e)}')
+                f'could not cast {column} derived as {derived_datatype_name} to Int64: {str(e)}')
 
     # Attempt to cast the text to the derived datatype
     try:
@@ -355,98 +451,15 @@ def cast_nonstring_column(only_nonstring_schema, csvdf, column):
 
     return False
 
-def read_schema(target_table_name, silver_catalog, csv_schema, csvdf):
-    table_schema = {}
-    get_table_results = glue_client.get_table(DatabaseName=silver_catalog,
-                                        Name=athena_sanitize_name(target_table_name))
-    logger.info(f"getting schema for table {silver_catalog}.{athena_sanitize_name(target_table_name)}")
-
-    for table_column in get_table_results['Table']['StorageDescriptor']['Columns']:
-        table_schema[table_column['Name']] = table_column['Type']
-        logger.info(f"table schema : {table_column['Name']} : {table_column['Type']}")
-
-    for table_column in get_table_results['Table']['StorageDescriptor']['Columns']:
-        table_schema[table_column['Name']] = table_column['Type']
-
-    # copy the old csv schema to start the new schema
-    new_schema = csv_schema.copy()
-
-    # if the csv schema column matches an existing table schema column, update the csv schema to match match
-    # the table's schema
-    for column in new_schema:
-        if column in table_schema:
-            # look up the datatype from the table in our data_type_map (convert the datatype name to uppercase
-            # first for the lookup matching)
-            new_schema[column] = data_type_map[table_schema[column].upper()]
-
-    logger.info(f'csvSchema:{csv_schema}')
-    logger.info(f'newSchema:{new_schema}')
-
-    # convert the CSV dataframe Schema to the new schema that was read from the glue table (if it exists)
-    for c in csvdf.columns:
-        if csvdf[c].dtype != new_schema[c]:
-            logger.info(
-                f'{c} datatype in file {csvdf[c].dtype} does not match datatype in table {new_schema[c]}')
-            try:
-                if new_schema[c] == np.int64:
-                    csvdf[c].fillna(-1, inplace=True)
-                    csvdf[c].replace('nan', -1, inplace=True)
-                csvdf[c] = csvdf[c].astype(new_schema[c])
-                logger.info(f'casted {c} as {new_schema[c]} to match table')
-                print(f"dtype:{csvdf[c].dtype}")
-                print(f"value is:{csvdf[c]}")
-            except (TypeError, ValueError) as e:
-                logger.info(f'could not cast {c} to {new_schema[c]} to match table: {str(e)}')
-
-    return table_schema
-
-def general_schema_conversion(target_table_name, silver_catalog, csvdf):
-    logger.info(
-        f'Caught exception, destination table {silver_catalog}.{target_table_name} does not exist, attempting to '
-        f'cast all numbers to Int64 if possible')
-
-    # If there are blanks in the data integers will be cast to floats which causes inconsistent parquet schema
-    # Convert any numbers to Int64 (as opposed to int64) since Int64 can handle nulls
-    for c in csvdf.select_dtypes(np.number).columns:
-        try:
-            csvdf[c] = csvdf[c].astype('Int64')
-            logger.info(f'casted {c} as Int64')
-        except (TypeError, ValueError) as e:
-            logger.info(f'could not cast {c} to Int64: {str(e)}')
-
-def check_column_type(column, only_string_schema, csvdf, only_nonstring_schema):
-
-    # If the derived types for the ext column is not a nonstring then fill na with blank string (rather than -1)
-    if column in only_string_schema:
-        # Fill NA values for string type columns with empty strings
-        # csvdf[column].fillna('', inplace=True)
-        # Explicitly cast string type columns as string
-        csvdf[column] = csvdf[column].astype(str)
-        return True
-    # if the column is derived as a nonstring then we need to try to cast it to the appropriate type with rules
-    if column in only_nonstring_schema:
-        if cast_nonstring_column(only_nonstring_schema=only_nonstring_schema,column=column,csvdf=csvdf):
-            return True
-    
-    return False
-
-def iterate_csvdf_cols(csvdf, only_string_schema, only_nonstring_schema):
-    # Iterate over the text only columns
-    for column in csvdf.columns:
-        
-        if check_override_match(column, csvdf):
-            continue
-
-        if check_column_type(column=column, only_string_schema=only_string_schema, csvdf=csvdf,only_nonstring_schema=only_nonstring_schema):
-            continue
-
 
 def process_files(source_locations, output_location, kms_key, silver_catalog):
     record_metric("SdlfHeavyTransformJob-num_files", len(source_locations))
+
     for key in source_locations:  # added for batching
         logger.info(f"Processing Key: {key}")  # added for batching
-        source_location = key
-        source_bucket, source_key = get_bucket_and_key_from_s3_uri(source_location)
+        source_location_key = key
+
+        source_bucket, source_key = get_bucket_and_key_from_s3_uri(source_location_key)
 
         try:
             source_s3_object = s3_resource.Object(source_bucket, source_key).get()
@@ -456,8 +469,9 @@ def process_files(source_locations, output_location, kms_key, silver_catalog):
             continue
 
         source_file_partitioned_path = source_s3_object['Metadata']['partitionedpath']
-        source_file_base_name = source_s3_object['Metadata']['filebasename']
+        source_file_basename = source_s3_object['Metadata']['filebasename']
         source_file_workflow_name = source_s3_object['Metadata']['workflowname']
+        source_file_timestamp = source_s3_object['Metadata']['filetimestamp']
 
         target_table_name = source_file_partitioned_path.split('/')[0]
 
@@ -509,9 +523,11 @@ def process_files(source_locations, output_location, kms_key, silver_catalog):
 
         logger.info(f"only_string_schema : {only_string_schema}")
 
-        iterate_csvdf_cols(csvdf=csvdf, only_string_schema=only_string_schema, only_nonstring_schema=only_nonstring_schema)
-
-        s3_output_path = f'{output_location}/{source_file_partitioned_path}/{source_file_base_name}.parquet'
+        # Iterate over the text only columns
+        iterate_csvdf_cols(csvdf=csvdf, only_string_schema=only_string_schema,
+                           only_nonstring_schema=only_nonstring_schema)
+    
+        s3_output_path = f'{output_location}/{source_file_partitioned_path}/{source_file_timestamp}-{source_file_basename}.parquet'
 
         # create a dictioary that contains the CSV file's casted schema
         csv_schema = dict(zip([*csvdf.columns], [*csvdf.dtypes]))
@@ -521,13 +537,14 @@ def process_files(source_locations, output_location, kms_key, silver_catalog):
         table_exist = 1
         table_schema = None
         try:
-            table_schema = read_schema(target_table_name=target_table_name, silver_catalog=silver_catalog, csv_schema=csv_schema, csvdf=csvdf)
+            table_schema = read_schema(target_table_name=target_table_name, silver_catalog=silver_catalog,
+                                       csv_schema=csv_schema, csvdf=csvdf)
 
         # Catch the exception if the table does not exist and apply the generic logic to try to handle schema
         # conversions
         except glue_client.exceptions.EntityNotFoundException:
-            general_schema_conversion(target_table_name=target_table_name, silver_catalog=silver_catalog, csvdf=csvdf)
             table_exist = 0
+            general_schema_conversion(target_table_name=target_table_name, silver_catalog=silver_catalog, csvdf=csvdf)
 
         logger.info(f'Converted Schema: {csvdf.dtypes}\n')
         logger.info(f'{len(csvdf)} records')
@@ -535,7 +552,6 @@ def process_files(source_locations, output_location, kms_key, silver_catalog):
         # write the parquet file using the kms key
         # Note: if writing to parquet and not as a dataset must specify entire path name.
         out_buffer = io.BytesIO()
-
         csvdf.to_parquet(out_buffer, index=False, compression='snappy')
 
         output_bucket, output_key = get_bucket_and_key_from_s3_uri(s3_output_path)
@@ -554,7 +570,6 @@ def process_files(source_locations, output_location, kms_key, silver_catalog):
         record_metric("SdlfHeavyTransformJob-bytes_written", bytes_written)
         num_records = len(csvdf)
         record_metric("SdlfHeavyTransformJob-num_records", num_records)
-
 
         csv_schema = {}
         for colm in csvdf.columns:
@@ -576,6 +591,7 @@ def process_files(source_locations, output_location, kms_key, silver_catalog):
 
         # add partitions
         add_partitions(outputfilebasepath, silver_catalog, list_partns, target_table_name)
+
 
 def record_metric(metric_name, metric_value):
     logger.info(
@@ -616,4 +632,3 @@ if __name__ == '__main__':
 
     ## Processing the files
     process_files(source_locations, output_location, kms_key, silver_catalog)
-

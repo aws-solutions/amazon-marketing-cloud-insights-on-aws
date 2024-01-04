@@ -246,6 +246,7 @@ def source_code_package(ctx, ignore, solution_name):
         "CONTRIBUTING.md",
         "CHANGELOG.md",
         ".gitignore",
+        "solution-manifest.yaml"
     ]
 
     # copy source directory

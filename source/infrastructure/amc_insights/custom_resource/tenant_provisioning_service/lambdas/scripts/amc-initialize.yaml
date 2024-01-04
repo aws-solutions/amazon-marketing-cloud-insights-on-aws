@@ -284,21 +284,17 @@ Resources:
     Type: AWS::Events::Rule
     Condition: DeployStandardRule
     Properties:
-      Description: "Trigger SDLF data lake process"
+      Description: !Sub "(Standard) Trigger data lake for bucket: ${pBucketName}"
       State: "ENABLED"
       EventPattern:
         source:
           - aws.s3
+        detail-type:
+          - "Object Created"
+          - "Object Deleted"
         detail:
-          eventSource:
-            - s3.amazonaws.com
-          eventName:
-            - CopyObject
-            - PutObject
-            - CompleteMultipartUpload
-            - DeleteObject
-          requestParameters:
-            bucketName:
+          bucket:
+            name:
               - !Ref pBucketName
       Targets:
         - Arn: !Ref pRoutingQueueArn
@@ -344,33 +340,29 @@ Resources:
     Type: AWS::Events::Rule
     Condition: DeployCrossRegionEvents
     Properties:
-      Description: "Trigger cross region event"
+      Description: !Sub "(Cross Region) Trigger data lake for bucket: ${pBucketName}"
       State: "ENABLED"
       EventPattern:
         source:
           - aws.s3
+        detail-type:
+          - "Object Created"
+          - "Object Deleted"
         detail:
-          eventSource:
-            - s3.amazonaws.com
-          eventName:
-            - CopyObject
-            - PutObject
-            - CompleteMultipartUpload
-            - DeleteObject
-          requestParameters:
-            bucketName:
+          bucket:
+            name:
               - !Ref pBucketName
       Targets:
         - Arn: !Sub "arn:aws:events:${pApplicationRegion}:${AWS::AccountId}:event-bus/default"
           RoleArn: !GetAtt rCrossRegionEventBridgeRole.Arn
           Id: "CrossRegionDefaultEventBus"
 
-  # Cross-region event rule for data lake trigger
+  # Cross-account event rule for data lake trigger
   rCrossAccountEventBridgeRule:
     Type: AWS::Events::Rule
     Condition: DeployCrossAccountRule
     Properties:
-      Description: "Trigger cross account event"
+      Description: !Sub "(Cross Account) Trigger data lake for bucket: ${pBucketName}"
       State: "ENABLED"
       EventPattern:
         source:
