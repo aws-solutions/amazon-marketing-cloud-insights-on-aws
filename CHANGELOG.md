@@ -8,7 +8,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Added timestamps to processed file names for prevention of accidental overwrites
 - Fixed null values casting as -1
-- Fixed column dropping issue caused by backslash characters in column cell values
 - Updated state machine to only trigger on successful file uploads
 
 ## [2.0.1] - 2023-10-25
