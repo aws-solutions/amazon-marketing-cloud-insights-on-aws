@@ -2,15 +2,15 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import pytest
-from moto import mock_dynamodb
+from moto import mock_aws
 import boto3
 from data_lake.foundations.lambdas.register.handler import on_update, on_delete, on_create
-from aws_solutions.core.helpers import get_service_resource, _helpers_service_resources
+from aws_solutions.core.helpers import _helpers_service_resources
 
 
 @pytest.fixture()
 def _dynamodb_resource():
-    with mock_dynamodb():
+    with mock_aws():
         ddb = boto3.resource('dynamodb', 'us-east-1')
         pipelines_table_attr = [
             {

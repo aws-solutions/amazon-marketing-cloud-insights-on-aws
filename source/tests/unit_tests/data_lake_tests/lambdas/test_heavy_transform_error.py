@@ -1,19 +1,11 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-import os
-
 import boto3
 import pytest
 from unittest.mock import Mock
-from moto import mock_sqs
+from moto import mock_aws
 
 from aws_solutions.core.helpers import get_service_client, _helpers_service_clients, _helpers_service_resources
-
-
-
-@pytest.fixture(autouse=True)
-def mock_env_variables():
-    os.environ["RESOURCE_PREFIX"] = "prefix"
 
 
 def side_effect(*args, **kwargs):
@@ -48,7 +40,7 @@ def _mock_ssm(monkeypatch, _mock_ssm_client):
 
 @pytest.fixture()
 def _mock_sqs_client_no_message():
-    with mock_sqs():
+    with mock_aws():
         sqs = boto3.resource('sqs', 'us-east-1')
         sqs.create_queue(
             QueueName='stage_dlq_name.fifo',

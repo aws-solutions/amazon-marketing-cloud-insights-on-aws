@@ -40,7 +40,7 @@ if [ $? == 1 ]; then
     if [ -d $venv_folder ]; then
       rm -rf $venv_folder
     fi
-    python3 -m venv $venv_folder
+    python3.11 -m venv $venv_folder
     source $venv_folder/bin/activate
 
     using_test_venv=1
@@ -53,6 +53,12 @@ else
   echo "------------------------------------------------------------------------------"
   echo "[Env] Using active virtual environment for tests"
   echo "------------------------------------------------------------------------------"
+  python_version=$(python --version 2>&1 | cut -d ' ' -f 2)
+  if [[ "$python_version" != "11"* ]]; then
+    echo "You are using Python version $python_version. Python version 11 is required."
+    echo "Update your environment or run tests again without an active environment."
+    exit 1
+  fi
   echo ''
 fi
 

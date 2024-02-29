@@ -3,9 +3,8 @@
 
 import pytest
 import boto3
-import sys
-from unittest.mock import Mock, MagicMock
-from moto import mock_dynamodb, mock_sqs
+from unittest.mock import Mock
+from moto import mock_aws
 from aws_solutions.core.helpers import get_service_client
 
 
@@ -30,7 +29,7 @@ def _mock_ssm_client():
 
 @pytest.fixture()
 def _mock_sqs_resource():
-    with mock_sqs():
+    with mock_aws():
         sqs = boto3.resource('sqs', 'us-east-1')
         sqs.create_queue(
             QueueName='prefix-adtech-insights-queue-a.fifo',
@@ -41,7 +40,7 @@ def _mock_sqs_resource():
 
 @pytest.fixture()
 def _mock_dynamodb_resource():
-    with mock_dynamodb():
+    with mock_aws():
         ddb = boto3.resource('dynamodb', 'us-east-1')
 
         object_metadata_table_attr = [

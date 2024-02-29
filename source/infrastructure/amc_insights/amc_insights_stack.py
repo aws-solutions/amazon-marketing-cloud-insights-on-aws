@@ -12,7 +12,7 @@ from data_lake.pipelines.sdlf_pipeline import SDLFPipelineConstruct
 from data_lake.datasets import SDLFDatasetConstruct
 from amc_insights.microservices.platform_management_service import PlatformManagerSageMaker
 from amc_insights.microservices.tenant_provisioning_service import TenantProvisioningService
-from amc_insights.custom_resource.anonymous_operational_metrics import OperationalMetrics
+from amc_insights.custom_resource.anonymized_operational_metrics import OperationalMetrics
 from amc_insights.custom_resource.cloudwatch_metrics.cloudwatch_metrics import CloudwatchMetrics
 from amc_insights.microservices.workflow_manager_service import WorkFlowManagerService
 from aws_cdk import CfnParameter, CfnCondition, Fn, Aspects

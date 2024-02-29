@@ -11,7 +11,7 @@ import os
 import boto3
 import pytest
 import json
-from moto import mock_s3
+from moto import mock_aws
 from unittest.mock import Mock, patch
 from aws_solutions.core.helpers import get_service_client, _helpers_service_clients
 
@@ -324,7 +324,7 @@ def test_delete_bucket_object(_mock_clients, lambda_event):
     delete_bucket_object(resource_properties=lambda_event["ResourceProperties"])
 
 
-@mock_s3
+@mock_aws
 def test_upload_bucket_object(lambda_event):
     from amc_insights.custom_resource.user_iam.lambdas.create_user_iam import upload_bucket_object, FILE_NAME
 

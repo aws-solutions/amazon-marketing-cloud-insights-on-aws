@@ -140,7 +140,7 @@ class SDLFPipelineConstruct(Construct):
             function_name=f"{self._resource_prefix}-data-lake-routing",
             code=Code.from_asset(os.path.join(f"{Path(__file__).parent.parent}", "pipelines/lambdas/routing")),
             handler="handler.lambda_handler",
-            description="Routes to the right team and pipeline",
+            description="Routes data to the right team and pipeline for processing",
             timeout=Duration.seconds(60),
             memory_size=256,
             runtime=Runtime.PYTHON_3_9,
@@ -242,7 +242,7 @@ class SDLFPipelineConstruct(Construct):
         )
 
         # This policy grants permission to record metrics in CloudWatch.
-        # This is needed for anonymous metrics.
+        # This is needed for anonymized metrics.
         cloudwatch_policy_statement = PolicyStatement(
             effect=Effect.ALLOW,
             actions=["cloudwatch:PutMetricData"],

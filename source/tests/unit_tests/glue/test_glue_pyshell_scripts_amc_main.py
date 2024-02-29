@@ -11,7 +11,7 @@ import json
 import os
 import pytest
 import boto3
-from moto import mock_lakeformation, mock_glue, mock_s3, mock_kms
+from moto import mock_aws
 from unittest.mock import patch, MagicMock
 import sys
 
@@ -139,7 +139,7 @@ def test_add_tags_lf(_mock_imports):
     database_name = ""
     table_name = ""
 
-    with mock_lakeformation():
+    with mock_aws():
         client = boto3.client("lakeformation", region_name=os.environ["AWS_DEFAULT_REGION"])
         client.create_lf_tag(
             TagKey=list(cust_hash_tag_dict.keys())[0],
@@ -153,7 +153,7 @@ def test_add_tags_lf(_mock_imports):
         assert ['some_tag_value', 'some_tag_value'] == client.get_lf_tag(TagKey=list(cust_hash_tag_dict.keys())[0])["TagValues"]
 
 
-@mock_glue
+@mock_aws
 def test_create_update_tbl(_mock_imports, fake_glue_table_attrs):
 
     from data_lake.glue.lambdas.sdlf_heavy_transform.adtech.amc.main import create_update_tbl
@@ -213,7 +213,7 @@ def test_cast_nonstring_column(_mock_imports):
     cast_nonstring_column(only_nonstring_schema={"test_column": "column_value"}, csvdf=MagicMock(), column="test_column")
 
 
-@mock_glue
+@mock_aws
 def test_read_schema(_mock_imports, fake_glue_table_attrs):
     from data_lake.glue.lambdas.sdlf_heavy_transform.adtech.amc.main import read_schema
 
@@ -274,9 +274,7 @@ def test_iterate_csvdf_cols(_mock_imports):
     )
 
 
-@mock_glue
-@mock_s3
-@mock_kms
+@mock_aws
 def test_process_files(_mock_imports, fake_glue_table_attrs):
     from data_lake.glue.lambdas.sdlf_heavy_transform.adtech.amc.main import process_files
 

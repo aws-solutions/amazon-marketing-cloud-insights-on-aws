@@ -143,7 +143,7 @@ def handler(event, _):
     message = f"created state machine execution response : {response} for request {execution_request}"
     logger.info(message)
 
-    # Record anonymous metric
+    # Record anonymized metric
     metrics.Metrics(METRICS_NAMESPACE, STACK_NAME, logger).put_metrics_count_value_1(metric_name="InvokeWorkflowExecutionSM")
 
     return json.dumps(response, default=utils.json_encoder_default)

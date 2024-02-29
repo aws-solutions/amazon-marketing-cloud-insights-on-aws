@@ -5,6 +5,7 @@ from constructs import Construct
 from aws_cdk import (
     Duration,
     Aws,
+    Fn,
     aws_lambda as lambda_,
     aws_iam as iam
 )
@@ -33,6 +34,10 @@ class CloudwatchMetrics(Construct):
         self._create_cloudwatch_metrics_function()
         self._create_event_bridge_rule()
 
+    @staticmethod
+    def send_anonymized_data():
+        return Fn.find_in_map("Solution", "Data", "SendAnonymizedData")
+
     def _create_iam_policy(self):
         secrets_manager_statement = PolicyStatement(
             effect=Effect.ALLOW,
@@ -40,7 +45,7 @@ class CloudwatchMetrics(Construct):
                 "secretsmanager:GetSecretValue"
             ],
             resources=[
-                f"arn:aws:secretsmanager:{Aws.REGION}:{Aws.ACCOUNT_ID}:secret:{Aws.STACK_NAME}-anonymous-metrics-uuid*"],
+                f"arn:aws:secretsmanager:{Aws.REGION}:{Aws.ACCOUNT_ID}:secret:{Aws.STACK_NAME}-anonymized-metrics-uuid*"],
         )
         cloudwatch_statement = PolicyStatement(
             effect=Effect.ALLOW,
@@ -85,7 +90,8 @@ class CloudwatchMetrics(Construct):
                 "STACK_NAME": Aws.STACK_NAME,
                 "SOLUTION_ID": self.node.try_get_context("SOLUTION_ID"),
                 "SOLUTION_VERSION": self.node.try_get_context("SOLUTION_VERSION"),
-                "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE")
+                "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),
+                "SEND_ANONYMIZED_DATA": self.send_anonymized_data(),
             },
             layers=[
                 SolutionsLayer.get_or_create(self)

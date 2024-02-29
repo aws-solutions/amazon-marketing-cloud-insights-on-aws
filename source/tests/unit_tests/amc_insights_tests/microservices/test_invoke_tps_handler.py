@@ -13,8 +13,8 @@ import boto3
 import pytest
 import json
 import decimal
-from unittest.mock import patch, Mock
-from moto import mock_stepfunctions, mock_iam
+from unittest.mock import Mock
+from moto import mock_aws
 from aws_solutions.core.helpers import get_service_client, _helpers_service_clients
 
 sys.path.insert(0,
@@ -109,8 +109,7 @@ def test_format_payload(customer_details):
     assert test_payload["bucketRegion"] == os.environ['APPLICATION_REGION']
 
 
-@mock_stepfunctions
-@mock_iam
+@mock_aws
 def test_handler(customer_details, _mock_clients):
     from amc_insights.microservices.tenant_provisioning_service.lambdas.InvokeTPSInitializeSM.handler import handler
 
@@ -127,9 +126,23 @@ def test_handler(customer_details, _mock_clients):
         "Version": "2012-10-17"
     }))
 
-    iam_client.attach_role_policy(
+    iam_client.put_role_policy(
         RoleName=test_role,
-        PolicyArn='arn:aws:iam::aws:policy/service-role/AWSLambdaRole'
+        PolicyName='LambdaAction',
+        PolicyDocument=json.dumps({
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "lambda:InvokeFunction"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
+                }
+            ],
+            "Version": "2012-10-17"
+        })
     )
 
     test_role_arn = iam_client.get_role(RoleName=test_role)

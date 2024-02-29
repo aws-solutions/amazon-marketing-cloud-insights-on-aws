@@ -11,11 +11,9 @@ import os
 import boto3
 from unittest.mock import MagicMock
 from datetime import datetime
-
-from moto import mock_sns, mock_dynamodb
+from moto import mock_aws
 
 from data_lake.lambda_layers.data_lake_library.python.datalake_library.octagon.metric import MetricRecordInfo, MetricAPI
-
 
 
 def test_metric_record_info():
@@ -31,7 +29,7 @@ def test_metric_api_create():
     for is_sns_set in [True, False]:
         sns_topic_name = "test_sns_topic"
         for test_expression in [["<", 10, 3], ["<=", 5, 3], ["=", 5, 5]]:
-            with mock_dynamodb(), mock_sns():
+            with mock_aws():
                 dynamodb_client = boto3.resource("dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"])
                 table_name = "metric_table"
                 notification_frequency = "ALWAYS"
@@ -46,7 +44,7 @@ def test_metric_api_create():
                     "BillingMode": "PAY_PER_REQUEST",
                 }
                 dynamodb_client.create_table(**params)
-                
+
                 sns_client = boto3.client('sns')
                 sns_client.create_topic(
                     Name=sns_topic_name,
@@ -81,14 +79,18 @@ def test_metric_api_create():
 
                 assert metric_api_cls.logger is not None
                 assert metric_api_cls.client == mock_client
-                assert metric_api_cls.metrics_table == mock_client.dynamodb.Table(mock_client.config.get_metrics_table())
+                assert metric_api_cls.metrics_table == mock_client.dynamodb.Table(
+                    mock_client.config.get_metrics_table())
                 assert metric_api_cls.metrics_ttl == mock_client.config.get_metrics_ttl()
 
                 assert None == metric_api_cls.create_metrics(date_str="2023-04-15", metric_code="test_metric", value=0)
 
-                assert True == metric_api_cls.create_metrics(date_str="2023-06-30", metric_code="Metric1#Metric2", value=test_expression[2])
+                assert True == metric_api_cls.create_metrics(date_str="2023-06-30", metric_code="Metric1#Metric2",
+                                                             value=test_expression[2])
 
-                sns_topic_arn = ":".join(["arn", "aws", "sns", os.environ["AWS_DEFAULT_REGION"], os.environ["MOTO_ACCOUNT_ID"], sns_topic_name])
+                sns_topic_arn = ":".join(
+                    ["arn", "aws", "sns", os.environ["AWS_DEFAULT_REGION"], os.environ["MOTO_ACCOUNT_ID"],
+                     sns_topic_name])
                 for metric_test in ["Metric1", "Metric1#Metric2"]:
                     table = dynamodb_client.Table(table_name)
                     result = table.get_item(
@@ -111,22 +113,22 @@ def test_metric_api_create():
                         assert result["Item"][expected_item] is not None
 
                 assert len(sns_client.list_topics()["Topics"]) == 1
-                
+
                 assert sns_client.list_topics()["Topics"][0]["TopicArn"] == sns_topic_arn
 
 
-@mock_sns
+@mock_aws
 def test_metric_api_update():
 
     sns_client = boto3.client('sns')
 
-    for test_expression in [[">", 3, 10, "ONCE"], [">=", 3, 5, "ALWAYS"]]:
+    for i, test_expression in enumerate([[">", 3, 10, "ONCE"], [">=", 3, 5, "ALWAYS"]]):
         sns_topic_name = f"test_sns_topic_{test_expression[3]}"
         test_alt_sns_topic_name = ":".join(["arn", "aws", "sns", os.environ["AWS_DEFAULT_REGION"], os.environ["MOTO_ACCOUNT_ID"], sns_topic_name])
         
-        with mock_dynamodb():
+        with mock_aws():
             dynamodb_client = boto3.resource("dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"])
-            table_name = "metric_table"
+            table_name = f"metric_table_{i}"
             params = {
                 "TableName": table_name,
                 "KeySchema": [
@@ -225,14 +227,13 @@ def test_metric_api_update():
     assert sns_client.list_topics()["Topics"][1]["TopicArn"] == "arn:aws:sns:us-east-1:111111111111:test_sns_topic_ALWAYS"
 
 
-@mock_sns
+@mock_aws
 def test_metric_api_no_notif():
-
-    sns_client = boto3.client('sns')
     for test_expression in [[">", 3, 10, "ONCE"]]:
         sns_topic_name = "test_sns_topic"
-        test_alt_sns_topic_name = ":".join(["arn", "aws", "sns", os.environ["AWS_DEFAULT_REGION"], os.environ["MOTO_ACCOUNT_ID"], sns_topic_name])
-        with mock_dynamodb():
+        test_alt_sns_topic_name = ":".join(
+            ["arn", "aws", "sns", os.environ["AWS_DEFAULT_REGION"], os.environ["MOTO_ACCOUNT_ID"], sns_topic_name])
+        with mock_aws():
             dynamodb_client = boto3.resource("dynamodb", region_name=os.environ["AWS_DEFAULT_REGION"])
             table_name = "metric_table"
             params = {
@@ -282,14 +283,12 @@ def test_metric_api_no_notif():
             assert metric_api_cls.metrics_table == mock_client.dynamodb.Table(mock_client.config.get_metrics_table())
             assert metric_api_cls.metrics_ttl == mock_client.config.get_metrics_ttl()
 
-            
             notif_tmpstmp = {}
             if test_expression[3] == "ONCE":
                 notif_tmpstmp = {"notification_timestamp": datetime.now().strftime("%Y-%m-%d")}
 
-            
             items = [
-                    {
+                {
                     "version": 2,
                     "metric": "Metric1",
                     "Value": 3,
@@ -309,7 +308,8 @@ def test_metric_api_no_notif():
                     TableName=table_name, Item=item
                 )
 
-            assert True == metric_api_cls.create_metrics(date_str="2023-06-30", metric_code="Metric1#Metric2", value=test_expression[2])
+            assert True == metric_api_cls.create_metrics(date_str="2023-06-30", metric_code="Metric1#Metric2",
+                                                         value=test_expression[2])
 
             for metric_test in ["Metric1", "Metric1#Metric2"]:
                 table = dynamodb_client.Table(table_name)
@@ -323,5 +323,5 @@ def test_metric_api_no_notif():
                 assert result["Item"]["metric"] == metric_test
                 assert result["Item"].get("notification_sns_message_id") is None
 
-    assert len(sns_client.list_topics()["Topics"]) == 1 # check if topics published
+    assert len(sns_client.list_topics()["Topics"]) == 1  # check if topics published
     assert sns_client.list_topics()["Topics"][0]["TopicArn"] == "arn:aws:sns:us-east-1:111111111111:test_sns_topic"

@@ -16,7 +16,7 @@ import json
 import sys
 import contextlib
 from datetime import datetime
-from moto import mock_dynamodb, mock_stepfunctions, mock_iam
+from moto import mock_aws
 
 from aws_solutions.core.helpers import get_service_client, _helpers_service_clients
 
@@ -120,9 +120,23 @@ def create_wf_state_machine():
         "Version": "2012-10-17"
     }))
 
-    iam_client.attach_role_policy(
+    iam_client.put_role_policy(
         RoleName=test_role,
-        PolicyArn='arn:aws:iam::aws:policy/service-role/AWSLambdaRole'
+        PolicyName='LambdaAction',
+        PolicyDocument=json.dumps({
+            "Statement": [
+                {
+                    "Effect": "Allow",
+                    "Action": [
+                        "lambda:InvokeFunction"
+                    ],
+                    "Resource": [
+                        "*"
+                    ]
+                }
+            ],
+            "Version": "2012-10-17"
+        })
     )
 
     test_role_arn = iam_client.get_role(RoleName=test_role)
@@ -143,7 +157,7 @@ def __mock_imports(monkeypatch):
     sys.modules['cloudwatch_metrics'] = mocked_cloudwatch_metrics
 
 
-@mock_dynamodb
+@mock_aws
 def test_dynamodb_get_wf_config(global_configs, __mock_imports):
     with create_workflow_table():
         from amc_insights.microservices.workflow_manager_service.lambdas.InvokeWorkflowExecutionSM.handler import \
@@ -192,52 +206,49 @@ def test_get_config_details(parsed_message, global_configs):
     )
 
 
-@mock_stepfunctions
-@mock_iam
+@mock_aws
 def test_start_state_machine(global_configs, parsed_message):
     with create_wf_state_machine():
         from amc_insights.microservices.workflow_manager_service.lambdas.InvokeWorkflowExecutionSM.handler import \
             start_state_machine
 
-        test_wf_config = {
-            'timeWindowStart': datetime.today().strftime(global_configs["wf_config_datetime_format"]),
-            'timeWindowEnd': datetime.now().strftime(global_configs["wf_config_datetime_format"]),
+    test_wf_config = {
+        'timeWindowStart': datetime.today().strftime(global_configs["wf_config_datetime_format"]),
+        'timeWindowEnd': datetime.now().strftime(global_configs["wf_config_datetime_format"]),
+    }
+
+    wf_config_datetime_format = global_configs["wf_config_datetime_format"]
+    wf_config_datetime_format2 = global_configs["wf_config_datetime_format2"]
+    parsed_message["uploadRequest"]['timeWindowStart'] = datetime.today().strftime(wf_config_datetime_format2)
+    parsed_message["uploadRequest"]['timeWindowEnd'] = datetime.now().strftime(wf_config_datetime_format2)
+
+    test_item = {
+        **test_wf_config,
+        "customerId": global_configs["customer_id"],
+        "datasetId": global_configs["dataset_id"],
+        "workflowId": "test_role_step_function"
+    }
+    start_state_machine(wf_config_list=[test_item], wf_config_datetime_format=wf_config_datetime_format,
+                        parsed_message=parsed_message, customer_id=global_configs["customer_id"])
+
+    # test exception
+    no_date_parsed_message = {
+        "uploadRequest": {
+            "requestType": "uploadData",
+            "dataSetId": global_configs["dataset_id"]
         }
+    }
 
-        wf_config_datetime_format = global_configs["wf_config_datetime_format"]
-        wf_config_datetime_format2 = global_configs["wf_config_datetime_format2"]
-        parsed_message["uploadRequest"]['timeWindowStart'] = datetime.today().strftime(wf_config_datetime_format2)
-        parsed_message["uploadRequest"]['timeWindowEnd'] = datetime.now().strftime(wf_config_datetime_format2)
-
-        test_item = {
-            **test_wf_config,
-            "customerId": global_configs["customer_id"],
-            "datasetId": global_configs["dataset_id"],
-            "workflowId": "test_role_step_function"
-        }
-        start_state_machine(wf_config_list=[test_item], wf_config_datetime_format=wf_config_datetime_format,
-                            parsed_message=parsed_message, customer_id=global_configs["customer_id"])
-
-        # test exception
-        no_date_parsed_message = {
-            "uploadRequest": {
-                "requestType": "uploadData",
-                "dataSetId": global_configs["dataset_id"]
-            }
-        }
-
-        test_item = {
-            **test_wf_config,
-            "customerId": global_configs["customer_id"],
-            "datasetId": global_configs["dataset_id"],
-        }
-        start_state_machine(wf_config_list=[test_item], wf_config_datetime_format=wf_config_datetime_format,
-                            parsed_message=no_date_parsed_message, customer_id=global_configs["customer_id"])
+    test_item = {
+        **test_wf_config,
+        "customerId": global_configs["customer_id"],
+        "datasetId": global_configs["dataset_id"],
+    }
+    start_state_machine(wf_config_list=[test_item], wf_config_datetime_format=wf_config_datetime_format,
+                        parsed_message=no_date_parsed_message, customer_id=global_configs["customer_id"])
 
 
-@mock_dynamodb
-@mock_stepfunctions
-@mock_iam
+@mock_aws
 def test_handler(global_configs, _mock_clients):
     with create_workflow_table(), create_wf_state_machine():
         from amc_insights.microservices.workflow_manager_service.lambdas.InvokeWorkflowExecutionSM.handler import \
@@ -340,9 +351,7 @@ def test_handler(global_configs, _mock_clients):
         handler(event=test_event, _=None)
 
 
-@mock_dynamodb
-@mock_stepfunctions
-@mock_iam
+@mock_aws
 def test_handler_empty_table(global_configs, _mock_clients):
     with create_wf_state_machine():
         from amc_insights.microservices.workflow_manager_service.lambdas.InvokeWorkflowExecutionSM.handler import \

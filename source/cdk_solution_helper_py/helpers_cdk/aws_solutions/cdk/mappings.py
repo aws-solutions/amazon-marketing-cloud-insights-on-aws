@@ -10,12 +10,12 @@ class Mappings:
         self,
         parent: Construct,
         solution_id: str,
-        send_anonymous_usage_data: bool = True,
+        send_anonymized_usage_data: bool = True,
         quicksight_template_arn: bool = False,
     ):
         self.parent = parent
 
-        # Track the solution mapping (ID, version, anonymous usage data)
+        # Track the solution mapping (ID, version, anonymized usage data)
         self.solution_mapping = CfnMapping(
             parent,
             "Solution",
@@ -23,8 +23,8 @@ class Mappings:
                 "Data": {
                     "ID": solution_id,
                     "Version": "%%SOLUTION_VERSION%%",
-                    "SendAnonymousUsageData": "Yes"
-                    if send_anonymous_usage_data
+                    "SendAnonymizedData": "Yes"
+                    if send_anonymized_usage_data
                     else "No",
                 }
             }

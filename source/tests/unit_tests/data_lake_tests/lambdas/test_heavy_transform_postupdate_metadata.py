@@ -1,15 +1,18 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
+# PURPOSE:
+#   * Unit test for data_lake/stages/sdlf_heavy_transform/lambdas/postupdate_metadata/handler.py
+# USAGE:
+#   ./run-unit-tests.sh --test-file-name data_lake_tests/lambdas/test_heavy_transform_postupdate_metadata.py
 import os
 from datetime import datetime
 
 import boto3
 import pytest
 from unittest.mock import Mock
-from moto import mock_dynamodb, mock_sqs, mock_s3
+from moto import mock_aws
 from dataclasses import dataclass
 from aws_solutions.core.helpers import get_service_client, _helpers_service_clients, _helpers_service_resources
-
 
 
 @pytest.fixture(autouse=True)
@@ -30,7 +33,7 @@ def _mock_sts_client():
 
 @pytest.fixture()
 def _dynamodb_resource():
-    with mock_dynamodb():
+    with mock_aws():
         ddb = boto3.resource('dynamodb', 'us-east-1')
         pipelines_table_attr = [
             {
@@ -172,7 +175,7 @@ def _mock_ssm_client():
 
 @pytest.fixture()
 def _s3_resource():
-    with mock_s3():
+    with mock_aws():
         s3 = boto3.resource('s3', 'us-east-1')
         s3.create_bucket(Bucket="stage_bucket")
         s3_object = s3.Object('stage_bucket', "post-stage/adtech/datasetA/filename/filename-parquet")

@@ -12,7 +12,7 @@ import os
 import sys
 import boto3
 import pytest
-from moto import mock_dynamodb, mock_cloudtrail, mock_s3
+from moto import mock_aws
 from unittest.mock import patch, MagicMock
 
 @pytest.fixture()
@@ -33,9 +33,7 @@ def apply_handler_env():
     os.environ['CLOUD_TRAIL_ARN'] = 'arn:aws:cloudtrail:us-east-1:111111111111:trail/test-trail'
 
 
-@mock_dynamodb
-@mock_cloudtrail
-@mock_s3
+@mock_aws
 @patch('aws_solutions.extended.resource_lookup.ResourceLookup.get_physical_id')
 def test_handler(mock_get_physical_id, _mock_imports):
     from amc_insights.microservices.tenant_provisioning_service.lambdas.AMCInstancePostDeployMetadata.handler import handler

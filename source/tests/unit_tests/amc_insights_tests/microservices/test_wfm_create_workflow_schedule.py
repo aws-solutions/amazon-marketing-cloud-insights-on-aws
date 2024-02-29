@@ -11,7 +11,7 @@ import boto3
 import pytest
 from unittest.mock import MagicMock
 import sys
-from moto import mock_events
+from moto import mock_aws
 
 events_client = boto3.client('events')
 
@@ -30,7 +30,7 @@ def _mock_imports():
     sys.modules['cloudwatch_metrics'] = mocked_cloudwatch_metrics
     
 
-@mock_events
+@mock_aws
 def test_handler(_mock_imports):
     from amc_insights.microservices.workflow_manager_service.lambdas.CreateWorkflowSchedule.handler import handler
 

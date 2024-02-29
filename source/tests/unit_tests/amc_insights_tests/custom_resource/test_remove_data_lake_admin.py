@@ -9,9 +9,9 @@
 
 import os
 import boto3
-from moto import mock_lakeformation
+from moto import mock_aws
   
-@mock_lakeformation
+@mock_aws
 def test_on_delete():
     from amc_insights.custom_resource.lakeformation_settings.lambdas.remove_data_lake_admin import on_delete
 

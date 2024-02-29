@@ -17,6 +17,7 @@ from aws_solutions.core.helpers import get_service_client
 SOLUTION_ID = os.environ["SOLUTION_ID"]
 SOLUTION_VERSION = os.environ["SOLUTION_VERSION"]
 METRICS_NAMESPACE = os.environ["METRICS_NAMESPACE"]
+SEND_ANONYMIZED_DATA = os.environ["SEND_ANONYMIZED_DATA"]
 
 SECONDS_IN_A_DAY = 86400
 
@@ -44,7 +45,11 @@ def event_handler(event, context):
     logger.info("We got the following event:\n")
     logger.info("event:\n {s}".format(s=event))
     logger.info("context:\n {s}".format(s=context))
-    send_metrics()
+    if SEND_ANONYMIZED_DATA == "Yes":
+        logger.info("Report anonymized operational metrics")
+        send_metrics()
+    else:
+        logger.info("Anonymized data collection is opted out, no operational metrics to report")
 
 
 def send_metrics():
@@ -57,7 +62,7 @@ def send_metrics():
     end_time = datetime.utcnow()
     start_time = (end_time - timedelta(seconds=SECONDS_IN_A_DAY))
     uuid = secrets_manager_client.get_secret_value(
-        SecretId=f"{os.environ['STACK_NAME']}-anonymous-metrics-uuid"
+        SecretId=f"{os.environ['STACK_NAME']}-anonymized-metrics-uuid"
     )['SecretString']
     # Assemble the payload structure for reporting:
     data = {
@@ -119,7 +124,8 @@ def send_metrics():
         # Add datapoints to the reporting payload:
         if datapoints:
             if len(datapoints) > 1:
-                logging.warning("Got " + str(len(datapoints)) + " datapoints but only expected one datapoint since period is one day and start/end time spans one day.")
+                logging.warning("Got " + str(
+                    len(datapoints)) + " datapoints but only expected one datapoint since period is one day and start/end time spans one day.")
             total = 0
             for datapoint in datapoints:
                 # There should only be one datapoint since period is one day and

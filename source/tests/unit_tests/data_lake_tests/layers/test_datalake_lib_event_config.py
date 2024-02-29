@@ -12,12 +12,12 @@ import os
 from urllib import parse
 
 import pytest
-from moto import mock_ssm
+from moto import mock_aws
 
 from data_lake.lambda_layers.data_lake_library.python.datalake_library.configuration.event_configs import EventConfig, EmptyEventConfig, S3EventConfig
 
 
-@mock_ssm
+@mock_aws
 def test_event_config():
     with pytest.raises(NotImplementedError):
         event_config_cls = EventConfig(event={})
@@ -34,7 +34,7 @@ def test_event_config():
         assert event_config_cls._ssm_interface == test_ssm_interface
 
 
-@mock_ssm
+@mock_aws
 def test_empty_event_config():
     with pytest.raises(NotImplementedError):
         empty_event_config_cls = EmptyEventConfig()
@@ -44,7 +44,7 @@ def test_empty_event_config():
         assert hasattr(empty_event_config_cls, "_fetch_from_event")
 
 
-@mock_ssm
+@mock_aws
 def test_s3_event_config():
     test_event = {
         "Records": [

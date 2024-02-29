@@ -1,9 +1,6 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import unittest
-from unittest.mock import MagicMock, patch
-from datetime import datetime
 from data_lake.lambda_layers.data_lake_library.python.datalake_library.octagon.client import OctagonClient
 
 def test_octagon_client():
