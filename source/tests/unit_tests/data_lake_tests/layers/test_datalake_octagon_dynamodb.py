@@ -2,9 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import itertools
-import unittest
-from unittest.mock import MagicMock, patch
-from datetime import datetime
+from unittest.mock import MagicMock
 from pytest import fixture
 from data_lake.lambda_layers.data_lake_library.python.datalake_library.octagon.dynamodb import clean_table
 

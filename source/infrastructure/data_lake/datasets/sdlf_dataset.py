@@ -127,7 +127,7 @@ class SDLFDatasetConstruct(Construct):
                     effect=Effect.ALLOW,
                 ),
                 # Grant permission to record metrics in cloudwatch.
-                # This is needed for anonymous metrics.
+                # This is needed for anonymized metrics.
                 PolicyStatement(
                     actions=[
                         "cloudwatch:PutMetricData"

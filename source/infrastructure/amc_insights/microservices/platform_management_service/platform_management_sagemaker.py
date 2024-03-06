@@ -9,7 +9,6 @@ from aws_cdk import (
     Aspects,
     CfnCondition,
     CfnOutput,
-    aws_lakeformation as lakeformation,
     aws_kms as kms,
     aws_sagemaker as sagemaker,
 )
@@ -46,6 +45,7 @@ class PlatformManagerSageMaker(Construct):
         self._creating_resources_condition = creating_resources_condition
 
         self._notebook_samples_prefix = "platform_notebook_manager_samples"
+        self._notebook_instance_name = f"{self._resource_prefix}-amc-insights-platform-manager-notebooks"
 
         PlatformManagerUploader(
             self, "SyncPlatformManager",
@@ -86,6 +86,17 @@ class PlatformManagerSageMaker(Construct):
             roles=[self.sagemaker_role],
             document=PolicyDocument(
                 statements=[
+                    # give sagemaker permission to execute Lifecycle configuration script to stop the instance if it's idle
+                    PolicyStatement(
+                        effect=Effect.ALLOW,
+                        actions=["sagemaker:DescribeNotebookInstance",
+                                 "sagemaker:StopNotebookInstance"
+                                 ],
+                        resources=[
+                            f"arn:aws:sagemaker:{Aws.REGION}:{Aws.ACCOUNT_ID}:notebook-instance/{self._notebook_instance_name}",
+                        ]
+                    ),
+
                     # give sagemaker permission to invoke the WFM SM startup lambdas
                     PolicyStatement(
                         effect=Effect.ALLOW,
@@ -149,7 +160,6 @@ class PlatformManagerSageMaker(Construct):
             )
         )
 
-
     def _create_sagemaker_lifecycle_config(self) -> None:
         """lifecycle config and notebook instance"""
 
@@ -165,7 +175,6 @@ class PlatformManagerSageMaker(Construct):
                     set -e
 
                     # Parameters
-                    IDLE_TIME=900
                     S3_BUCKET={self._solution_buckets.artifacts_bucket.bucket_name}
                     INVOKE_WORKFLOW_EXECUTION_SM_NAME="INVOKE_WORKFLOW_EXECUTION_SM_NAME={self._workflow_manager_resources.lambda_invoke_workflow_execution_sm.function_name}"
                     INVOKE_WORKFLOW_SM_NAME="INVOKE_WORKFLOW_SM_NAME={self._workflow_manager_resources.lambda_invoke_workflow_sm.function_name}"
@@ -202,7 +211,7 @@ class PlatformManagerSageMaker(Construct):
                     echo "Fetching the autostop script"
                     wget https://raw.githubusercontent.com/aws-samples/amazon-sagemaker-notebook-instance-lifecycle-config-samples/master/scripts/auto-stop-idle/autostop.py
                     echo "Starting the SageMaker autostop script in cron"
-                    (crontab -l 2>/dev/null; echo "*/5 * * * * /usr/bin/python $PWD/autostop.py --time $IDLE_TIME --ignore-connections") | crontab -
+                    (crontab -l 2>/dev/null; echo "*/5 * * * * $(which python) $PWD/autostop.py --time 900 --ignore-connections >> /var/log/autostop.log 2>&1") | crontab -
 
                     # Remove lost+found folder
                     rm -rf /home/ec2-user/SageMaker/lost+found
@@ -220,7 +229,7 @@ class PlatformManagerSageMaker(Construct):
             role_arn=self.sagemaker_role.role_arn,
             kms_key_id=self._sagemaker_kms_key.key_id,
             lifecycle_config_name=self.sagemaker_lifecycle_config.attr_notebook_instance_lifecycle_config_name,
-            notebook_instance_name=f"{self._resource_prefix}-amc-insights-platform-manager-notebooks",
+            notebook_instance_name=self._notebook_instance_name,
             root_access="Enabled",
         )
 

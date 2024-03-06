@@ -14,7 +14,7 @@ import sys
 import boto3
 import pytest
 from unittest.mock import MagicMock, patch
-from moto import mock_dynamodb, mock_sts, mock_iam, mock_apigateway
+from moto import mock_aws
 
 
 sys.path.insert(0, "./infrastructure/amc_insights/microservices/workflow_management_service/lambda_layers/wfm_layer/python/")
@@ -24,10 +24,7 @@ def apply_handler_env():
     os.environ['WORKFLOWS_TABLE_NAME'] = "wf_tbl_name"
 
 
-@mock_dynamodb
-@mock_sts
-@mock_iam
-@mock_apigateway
+@mock_aws
 def test_handler():
     from amc_insights.microservices.workflow_manager_service.lambdas.UpdateWorkflow.handler import handler
 

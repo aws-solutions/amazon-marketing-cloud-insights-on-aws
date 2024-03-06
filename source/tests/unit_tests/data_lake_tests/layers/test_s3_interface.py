@@ -13,15 +13,14 @@ import json
 
 import boto3
 import pytest
-from moto import mock_s3, mock_kms
+from moto import mock_aws
 from botocore.exceptions import ClientError
-from unittest.mock import MagicMock, Mock
+from unittest.mock import MagicMock
 
 from data_lake.lambda_layers.data_lake_library.python.datalake_library.interfaces.s3_interface import S3Interface
 
 
-@mock_s3
-@mock_kms
+@mock_aws
 def test_s3_interface():
     key_policy = {
         'Version': '2012-10-17',

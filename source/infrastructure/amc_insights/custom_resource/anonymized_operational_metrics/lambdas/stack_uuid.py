@@ -13,7 +13,7 @@ logger = Logger(service='Stack uuid secret for operational metrics', level="INFO
 helper = CfnResource()
 
 STACK_NAME = os.environ['STACK_NAME']
-secret_name = f"{STACK_NAME}-anonymous-metrics-uuid"
+secret_name = f"{STACK_NAME}-anonymized-metrics-uuid"
 
 
 def event_handler(event, context):
@@ -35,7 +35,7 @@ def on_create(event, _):
 
 def create_uuid():
     """
-    This function is responsible for creating the Secrets Manager uuid for anonymous metrics.
+    This function is responsible for creating the Secrets Manager uuid for anonymized metrics.
     """
 
     secrets_manager_client = get_service_client("secretsmanager")

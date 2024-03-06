@@ -194,7 +194,7 @@ class TenantProvisioningService(Construct):
             )
         )
         # Grant permission to record metrics in cloudwatch.
-        # This is needed for anonymous metrics.
+        # This is needed for anonymized metrics.
         self._lambda_invoke_tps_initialize_sm.add_to_role_policy(
             PolicyStatement(
                 effect=Effect.ALLOW,

@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict
 import json
-import aws_cdk as cdk
 from aws_cdk.aws_lambda import Code, LayerVersion, Runtime
 from aws_cdk import aws_stepfunctions as sfn, Aspects
 from aws_cdk.aws_iam import Effect, ManagedPolicy, PolicyDocument, PolicyStatement, Role, ServicePrincipal, Policy
@@ -157,7 +156,7 @@ class SDLFLightTransform(Construct):
                 "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),
                 "STACK_NAME": Aws.STACK_NAME
             },
-            description="Triggers Step Function",
+            description="Triggers Data Lake StageA step function",
             timeout=Duration.minutes(1),
             memory_size=256,
             architecture=lambda_.Architecture.ARM_64,
@@ -165,7 +164,7 @@ class SDLFLightTransform(Construct):
         )
 
         # Grant permission to record metrics in cloudwatch.
-        # This is needed for anonymous metrics.
+        # This is needed for anonymized metrics.
         self._routing_lambda.add_to_role_policy(
             PolicyStatement(
                 effect=Effect.ALLOW,
@@ -200,7 +199,7 @@ class SDLFLightTransform(Construct):
                 "STAGE": "StageA",
                 "RESOURCE_PREFIX": self.resource_prefix
             },
-            description="Redrive Step Function stageA",
+            description="Redrive Data Lake StageA Step Function",
             timeout=Duration.minutes(1),
             memory_size=256,
             architecture=lambda_.Architecture.ARM_64,
@@ -228,7 +227,7 @@ class SDLFLightTransform(Construct):
                 "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),
                 "RESOURCE_PREFIX": self.resource_prefix
             },
-            description="post update metadata",
+            description="Post update comprehensive catalogue metadata in Data Lake StageA",
             timeout=Duration.minutes(1),
             memory_size=256,
             architecture=lambda_.Architecture.ARM_64,
@@ -255,7 +254,7 @@ class SDLFLightTransform(Construct):
                 "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),
                 "RESOURCE_PREFIX": self.resource_prefix
             },
-            description="preupdate metadata",
+            description="Pre update comprehensive catalogue metadata in Data Lake StageA",
             timeout=Duration.minutes(1),
             memory_size=256,
             architecture=lambda_.Architecture.ARM_64,
@@ -281,7 +280,7 @@ class SDLFLightTransform(Construct):
                 "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),
                 "RESOURCE_PREFIX": self.resource_prefix
             },
-            description="send errors to DLQ",
+            description="Send errors to DLQ in Data Lake StageA",
             timeout=Duration.minutes(1),
             memory_size=256,
             architecture=lambda_.Architecture.ARM_64,
@@ -308,7 +307,7 @@ class SDLFLightTransform(Construct):
                 "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),
                 "RESOURCE_PREFIX": self.resource_prefix
             },
-            description="executes lights transform",
+            description="Executes lights transform in Data Lake StageA",
             timeout=Duration.minutes(15),
             memory_size=1536,
             runtime=Runtime.PYTHON_3_9,

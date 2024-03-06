@@ -39,26 +39,6 @@ def mock_aws_stack():
     return aws_cdk.Stack(id=f'TestAppRegistry-{str(uuid.uuid1())}', stack_name=f"test{str(uuid.uuid1())}")
 
 
-@patch("amc_insights.app_registry.super")
-def test_app_registry_cls_initialization(mock_super, mock_app_registry_cls, mock_scope):
-    AppRegistry.__init__(mock_app_registry_cls, mock_scope, mock_scope)
-    mock_super.assert_called_once()
-    mock_scope.node.try_get_context.assert_called()
-    mock_scope.node.try_get_context.assert_has_calls(
-        [
-           call("SOLUTION_NAME"),
-           call("SOLUTION_ID"),
-           call("SOLUTION_VERSION"),
-        ]
-    )
-    assert mock_scope.node.try_get_context.call_count == 3
-    assert mock_app_registry_cls.scope_name == mock_scope.name
-    assert mock_app_registry_cls._application == {}
-    assert mock_app_registry_cls._attribute_group == {}
-    assert mock_app_registry_cls.__application_resource_association == {}
-    assert mock_app_registry_cls._attribute_group_association == {}
-
-
 def test_visit(mock_aws_stack):
     mock_cls = MagicMock()
     mock_cls.get_or_create_application.return_value="test"

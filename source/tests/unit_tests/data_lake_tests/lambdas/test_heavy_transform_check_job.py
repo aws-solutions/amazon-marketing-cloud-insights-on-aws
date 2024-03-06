@@ -1,19 +1,12 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-import os
 import boto3
 import pytest
 from unittest.mock import Mock, MagicMock
 import sys
-from moto import mock_dynamodb
+from moto import mock_aws
 from dataclasses import dataclass
 from aws_solutions.core.helpers import get_service_client, _helpers_service_clients, _helpers_service_resources
-
-
-
-@pytest.fixture(autouse=True)
-def mock_env_variables():
-    os.environ["RESOURCE_PREFIX"] = "prefix"
 
 
 @pytest.fixture()
@@ -42,7 +35,7 @@ def _mock_sts_client():
 
 @pytest.fixture()
 def _dynamodb_resource():
-    with mock_dynamodb():
+    with mock_aws():
         ddb = boto3.resource('dynamodb', 'us-east-1')
         peh_table_attr = [
             {
@@ -154,6 +147,7 @@ def _mock_clients(monkeypatch, _mock_sts_client, _dynamodb_resource, _mock_ssm_c
     monkeypatch.setitem(_helpers_service_resources, 'dynamodb', _dynamodb_resource)
     monkeypatch.setitem(_helpers_service_clients, 'ssm', _mock_ssm_client)
     monkeypatch.setitem(_helpers_service_clients, 'glue', _mock_glue)
+
 
 @pytest.fixture()
 def _mock_imports():

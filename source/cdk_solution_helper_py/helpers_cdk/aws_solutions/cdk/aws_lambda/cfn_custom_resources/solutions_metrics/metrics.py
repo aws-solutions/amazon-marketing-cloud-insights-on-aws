@@ -19,7 +19,7 @@ from aws_solutions.cdk.cfn_nag import add_cfn_nag_suppressions, CfnNagSuppressio
 from cdk_nag import NagSuppressions
 
 class Metrics(Construct):
-    """Used to track anonymous solution deployment metrics."""
+    """Used to track anonymized solution deployment metrics."""
 
     def __init__(
         self,
@@ -55,14 +55,14 @@ class Metrics(Construct):
             ],
         )
 
-        self._send_anonymous_usage_data = CfnCondition(
+        self._send_anonymized_usage_data = CfnCondition(
             self,
-            "SendAnonymousUsageData",
+            "SendAnonymizedData",
             expression=Fn.condition_equals(
-                Fn.find_in_map("Solution", "Data", "SendAnonymousUsageData"), "Yes"
+                Fn.find_in_map("Solution", "Data", "SendAnonymizedData"), "Yes"
             ),
         )
-        self._send_anonymous_usage_data.override_logical_id("SendAnonymousUsageData")
+        self._send_anonymized_usage_data.override_logical_id("SendAnonymizedData")
 
         properties = {
             "ServiceToken": self._metrics_function.function_arn,
@@ -73,12 +73,12 @@ class Metrics(Construct):
         }
         self.solution_metrics = CfnResource(
             self,
-            "SolutionMetricsAnonymousData",
-            type="Custom::AnonymousData",
+            "SolutionMetricsAnonymizedData",
+            type="Custom::AnonymizedData",
             properties=properties,
         )
-        self.solution_metrics.override_logical_id("SolutionMetricsAnonymousData")
-        self.solution_metrics.cfn_options.condition = self._send_anonymous_usage_data
+        self.solution_metrics.override_logical_id("SolutionMetricsAnonymizedData")
+        self.solution_metrics.cfn_options.condition = self._send_anonymized_usage_data
 
         NagSuppressions.add_resource_suppressions(
             self._metrics_function.role,

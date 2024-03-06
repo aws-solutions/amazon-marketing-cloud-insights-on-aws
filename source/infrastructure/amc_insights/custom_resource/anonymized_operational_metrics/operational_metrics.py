@@ -45,7 +45,7 @@ class OperationalMetrics(Construct):
                 "secretsmanager:GetSecretValue"
             ],
             resources=[
-                f"arn:aws:secretsmanager:{Aws.REGION}:{Aws.ACCOUNT_ID}:secret:{Aws.STACK_NAME}-anonymous-metrics-uuid*"],
+                f"arn:aws:secretsmanager:{Aws.REGION}:{Aws.ACCOUNT_ID}:secret:{Aws.STACK_NAME}-anonymized-metrics-uuid*"],
         )
 
         self.operational_metrics_lambda_iam_policy = iam.Policy(
@@ -57,15 +57,15 @@ class OperationalMetrics(Construct):
 
     def _create_operational_metrics_lambda(self):
         """
-        This function is responsible for creating the anonymous operational metrics uuid in Secrets Manager.
+        This function is responsible for creating the anonymized operational metrics uuid in Secrets Manager.
         """
         self._operational_metrics_lambda = SolutionsPythonFunction(
             self,
             "CreateOperationalMetrics",
-            AMC_INSIGHTS_CUSTOM_RESOURCE_PATH / "anonymous_operational_metrics" / "lambdas" / "stack_uuid.py",
+            AMC_INSIGHTS_CUSTOM_RESOURCE_PATH / "anonymized_operational_metrics" / "lambdas" / "stack_uuid.py",
             "event_handler",
             runtime=lambda_.Runtime.PYTHON_3_9,
-            description="Lambda function for custom resource for the creating anonymous operational metrics uuid in Secrets Manager",
+            description="Lambda function for custom resource for the creating anonymized operational metrics uuid in Secrets Manager",
             timeout=Duration.minutes(5),
             memory_size=256,
             architecture=lambda_.Architecture.ARM_64,
@@ -91,7 +91,7 @@ class OperationalMetrics(Construct):
 
     def _create_operational_metrics_custom_resource(self):
         """
-        This function creates the customer resource for creating the anonymous operational metrics uuid in Secrets Manager.
+        This function creates the customer resource for creating the anonymized operational metrics uuid in Secrets Manager.
         """
         self._operational_metrics_custom_resource = CustomResource(
             self,

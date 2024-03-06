@@ -8,14 +8,13 @@
 
 
 import os
-import sys
 import json
 import contextlib
 from unittest.mock import patch, mock_open, MagicMock
 
 import pytest
 import boto3
-from moto import mock_dynamodb
+from moto import mock_aws
 from botocore.exceptions import ClientError
 
 from aws_solutions.core.helpers import get_service_client
@@ -49,7 +48,7 @@ def mock_sev_path():
         }
 
 
-@mock_dynamodb
+@mock_aws
 def test_main(aws_credentials):
      with mock_sev_path() as mock_vars:
         expected_transform = {'stuff': 'some_transforms'}
@@ -83,7 +82,7 @@ def test_main(aws_credentials):
         mock_vars["mock_file"].assert_called_with(MAP_FILE_LOC)
 
 
-@mock_dynamodb
+@mock_aws
 def test_main_client_error(aws_credentials):
     with mock_sev_path() as mock_vars:
         error_response = {
@@ -100,7 +99,7 @@ def test_main_client_error(aws_credentials):
         mock_vars["mock_file"].assert_called_with(MAP_FILE_LOC)
 
 
-@mock_dynamodb
+@mock_aws
 def test_main_exception(aws_credentials):
     with mock_sev_path() as mock_vars:
         mock_update_item = MagicMock()

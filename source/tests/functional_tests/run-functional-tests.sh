@@ -89,9 +89,6 @@ msg "- Region: ${region}"
 msg "- Profile: ${profile}"
 msg "- Email: ${email}"
 
-echo "------------------------------------------------------------------------------"
-echo "Creating a temporary Python virtualenv for this script"
-echo "------------------------------------------------------------------------------"
 # Make sure aws cli is installed
 if [[ ! -x "$(command -v aws)" ]]; then
   echo "ERROR: This script requires the AWS CLI to be installed. Please install it then run again."
@@ -102,7 +99,9 @@ create_venv() {
   if [ $in_venv ]; then
     echo "Run tests in a virtualenv, skip creating virtualenv"
   else
-    echo "Create virtual python environment:"
+    echo "------------------------------------------------------------------------------"
+    echo "Creating a temporary Python virtualenv for this script"
+    echo "------------------------------------------------------------------------------"
     VENV=$(mktemp -d) && echo "$VENV"
     command -v python3 >/dev/null
     if [ $? -ne 0 ]; then
@@ -130,6 +129,9 @@ source_dir="$(
 if [ $using_existing_stack ]; then
   echo "Use an existing stack, skip testing stack synthesize and deploy"
 else
+  echo "------------------------------------------------------------------------------"
+  echo "Deploying a new AMC Insights stack"
+  echo "------------------------------------------------------------------------------"
   # create a new cloudformation role with IAM_POLICY_INSTALL.json to test when deploying
   echo "Creating cloudformation role with IAM_POLICY_INSTALL.json"
   cd "$current_dir/test_install_policy"
@@ -153,7 +155,9 @@ fi
 #######################
 cd "$source_dir/infrastructure/scripts/test_scripts"
 
-echo "Test AMC Dataset/Microservices"
+echo "------------------------------------------------------------------------------"
+echo "Running AMC Dataset/Microservice tests"
+echo "------------------------------------------------------------------------------"
 if [ $no_clean ]; then
   if [ $bucket_profile ]; then
     sh run-test.sh --stack-name $stack_name --profile $profile --region $region --no-clean --in-venv --bucket-profile $bucket_profile
@@ -172,22 +176,30 @@ fi
 #####   TEST EXTENDED DATASET  #####
 ####################################
 cd "$current_dir/test_extended_dataset"
+
+echo "------------------------------------------------------------------------------"
+echo "Running Extended Dataset tests"
+echo "------------------------------------------------------------------------------"
 sh run-test.sh --stack-name $stack_name --profile $profile --region $region --email $email
 
 ########################################
 #####   CLEAN UP STACK RESOURCES   #####
 ########################################
-export AWS_REGION=$region
+export AWS_DEFAULT_REGION=$region
 export AWS_PROFILE=$profile
 export STACK=$stack_name
 
-if [ $using_existing_stack ]; then
-  echo "Use an existing stack, doesn't delete stack after testing"
-fi
-if [ $no_clean ]; then
-  echo "--no-clean param passed, doesn't delete stack after testing"  
+if [ $using_existing_stack ] || [ $no_clean ]; then
+  if [ $using_existing_stack ]; then
+    echo "Using an existing stack, doesn't delete stack after testing"
+  else
+    echo "--no-clean param passed, doesn't delete stack after testing"
+  fi 
 else
-  echo "Delete stack $stack_name resources"
+  echo "------------------------------------------------------------------------------"
+  echo "Deleting stack"
+  echo "------------------------------------------------------------------------------"
+
   cd "$current_dir/test_stack_deploy"
   python3 python/cleanup_resources.py
 

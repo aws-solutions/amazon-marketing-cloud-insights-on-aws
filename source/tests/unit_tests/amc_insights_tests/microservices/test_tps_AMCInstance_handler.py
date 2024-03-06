@@ -13,8 +13,8 @@ import os
 import pytest
 import boto3
 import json
-from moto import mock_s3, mock_kms, mock_cloudformation
-from unittest.mock import Mock, patch
+from moto import mock_aws
+from unittest.mock import patch
 
 
 @pytest.fixture
@@ -97,9 +97,7 @@ def mock_handler_resource(test_yaml):
     yield kms_res["KeyMetadata"]["KeyId"]
 
 
-@mock_cloudformation
-@mock_kms
-@mock_s3
+@mock_aws
 @patch('aws_solutions.extended.resource_lookup.ResourceLookup.get_physical_id')
 def test_handler(mock_get_physical_id, test_yaml):
 

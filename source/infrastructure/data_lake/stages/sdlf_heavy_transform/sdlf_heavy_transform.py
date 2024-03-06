@@ -76,7 +76,7 @@ class SDLFHeavyTransform(Construct):
                 "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),
                 "STACK_NAME": Aws.STACK_NAME
             },
-            description="Triggers Step Function stageB",
+            description="Triggers Data Lake StageB step function",
             timeout=Duration.minutes(1),
             memory_size=256,
             architecture=lambda_.Architecture.ARM_64,
@@ -106,7 +106,7 @@ class SDLFHeavyTransform(Construct):
                 "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),
                 "STACK_NAME": Aws.STACK_NAME
             },
-            description="Redrive Step Function stageB",
+            description="Redrive Data Lake StageB step function",
             timeout=Duration.minutes(1),
             memory_size=256,
             runtime=Runtime.PYTHON_3_9,
@@ -134,7 +134,7 @@ class SDLFHeavyTransform(Construct):
                 "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),
                 "STACK_NAME": Aws.STACK_NAME
             },
-            description="post update metadata",
+            description="Post update comprehensive catalogue metadata in Data Lake StageB",
             timeout=Duration.minutes(1),
             memory_size=256,
             runtime=Runtime.PYTHON_3_9,
@@ -162,7 +162,7 @@ class SDLFHeavyTransform(Construct):
                 "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),
                 "STACK_NAME": Aws.STACK_NAME
             },
-            description="check if glue job still running",
+            description="Check if glue job still running in Data Lake StageB",
             timeout=Duration.minutes(1),
             memory_size=256,
             architecture=lambda_.Architecture.ARM_64,
@@ -189,7 +189,7 @@ class SDLFHeavyTransform(Construct):
                 "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),
                 "STACK_NAME": Aws.STACK_NAME
             },
-            description="send errors to DLQ",
+            description="Send errors to DLQ in Data Lake StageB",
             timeout=Duration.minutes(1),
             memory_size=256,
             runtime=Runtime.PYTHON_3_9,
@@ -217,7 +217,7 @@ class SDLFHeavyTransform(Construct):
                 "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),
                 "STACK_NAME": Aws.STACK_NAME
             },
-            description="execute heavy transform",
+            description="Execute heavy transform in Data Lake StageB",
             timeout=Duration.minutes(15),
             memory_size=256,
             architecture=lambda_.Architecture.ARM_64,
@@ -396,7 +396,7 @@ class SDLFHeavyTransform(Construct):
         )
 
         # This policy grants permission to record metrics in CloudWatch.
-        # This is needed for anonymous metrics.
+        # This is needed for anonymized metrics.
         cloudwatch_policy_statement = PolicyStatement(
                 effect=Effect.ALLOW,
                 actions=["cloudwatch:PutMetricData"],

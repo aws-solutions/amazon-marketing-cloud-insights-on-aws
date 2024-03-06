@@ -71,7 +71,7 @@ To customize the solution, follow the steps below:
 The following procedures assumes that all the OS-level configuration has been completed. They are:
 
 * [AWS Command Line Interface](https://aws.amazon.com/cli/)
-* [Python](https://www.python.org/) 3.9 or newer
+* [Python](https://www.python.org/) 3.11 or newer
 * [Node.js](https://nodejs.org/en/) 16.x or newer
 * [AWS CDK](https://aws.amazon.com/cdk/) 2.60.0 or newer
 
