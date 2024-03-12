@@ -78,9 +78,9 @@ def handler(event, _):
     remove_target_response = events_remove_target(rule_name=rule_name, client=events_client)
 
     if remove_target_response.get('ResponseMetadata', {}).get('HTTPStatusCode', 0) in range(200, 299):
-        logger.info(f"successfully deleted rule target for rule {rule_name.get('Name')}: {remove_target_response}")
+        logger.info(f"successfully deleted rule target for rule {rule_name}: {remove_target_response}")
 
         delete_rule_response = events_delete_rule(rule_name=rule_name, client=events_client)
 
         if delete_rule_response.get('ResponseMetadata', {}).get('HTTPStatusCode', 0) in range(200, 299):
-            logger.info(f"successfully deleted rule {rule_name.get('Name')}: {delete_rule_response}")
+            logger.info(f"successfully deleted rule {rule_name}: {delete_rule_response}")
