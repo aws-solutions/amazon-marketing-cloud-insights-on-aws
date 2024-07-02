@@ -45,9 +45,6 @@ def on_delete(event, _):
             except lakeformation_client.exceptions.ConcurrentModificationException:
                 logger.info("Concurrent modification excpetion. Waiting 10 seconds to retry")
                 time.sleep(10)
-            except Exception as e:
-                logger.error(e)
-                raise e
             
     
 @helper.create

@@ -326,12 +326,12 @@ class SDLFLightTransform(Construct):
         self._foundations_resources.stage_bucket_key.grant_encrypt(self._process_lambda)
         self._foundations_resources.stage_bucket.grant_write(self._process_lambda)
 
-        lambda_functions = [self._routing_lambda, self._postupdate_lambda, self._preupdate_lambda,
+        self.lambda_functions = [self._routing_lambda, self._postupdate_lambda, self._preupdate_lambda,
                             self._process_lambda, self._error_lambda, self._redrive_lambda]
 
-        self._add_layers(lambda_functions)
-        self._create_and_attach_policy_to_lambda_roles(team, pipeline, lambda_functions)
-        self._add_dependencies(lambda_functions)
+        self._add_layers(self.lambda_functions)
+        self._create_and_attach_policy_to_lambda_roles(team, pipeline, self.lambda_functions)
+        self._add_dependencies(self.lambda_functions)
 
     def _add_layers(self, lambda_functions):
         self._process_lambda.add_layers(self._foundations_resources.wrangler_layer)
@@ -572,7 +572,11 @@ class SDLFLightTransform(Construct):
             'sdlf-light-sm-a-log-group', 
             log_group_name=_log_group_name,
             retention=logs.RetentionDays.INFINITE
-            )
+        )
+        add_cfn_nag_suppressions(
+            _sfn_log_group.node.default_child, 
+            suppressions=[CfnNagSuppression("W86", "Log retention period set to INFINITE")]
+        )
 
         sfn_role: Role = Role(
             self,

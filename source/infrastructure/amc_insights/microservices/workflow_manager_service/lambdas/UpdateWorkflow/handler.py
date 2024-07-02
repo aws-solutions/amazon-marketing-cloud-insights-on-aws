@@ -27,14 +27,15 @@ def handler(event, context):
     customer_config = event['customerConfig']
 
     # set up the AMC API Interface
-    wfm = wfm_amc_api_interface.AMCAPIInterface(customer_config, logger, utils)
+    wfm = wfm_amc_api_interface.AMCAPIs(customer_config, utils)
 
     # get the execution Request
     workflow_request = event.get('workflowRequest', {})
     workflow_definition = workflow_request.get('workflowDefinition', {}).copy()
-
     amc_response = wfm.update_workflow(workflow_definition)
+
     event.update(amc_response.response)
+    event["workflowId"] = workflow_definition.get('workflowId', '')
 
     if amc_response.success:
         utils.dynamodb_put_item(WORKFLOWS_TABLE_NAME, event)

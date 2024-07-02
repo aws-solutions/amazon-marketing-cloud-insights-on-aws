@@ -35,6 +35,9 @@ Available options:
 --profile         AWS profile for CLI commands
 --email           Email to receive notifications
 --role-arn        Cloudformation role to assume when deploying
+--extras          Append more commands to pytest run (optional)
+--test-file-name  Run individual test file (optional) e.g --test-file-name test_stack_deploy/test_create_stack.py or test_stack_deploy/test_create_stack.py::test_create_stack for single test.
+--in-venv         Run test in an existing virtual environment [--in-venv 1] (optional)
 EOF
   exit 1
 }
@@ -72,12 +75,18 @@ parse_params() {
       role_arn="${2}"
       shift
       ;;
-    -?*) die "Unknown option: $1" ;;
+    --in-venv)
+      in_venv="${2}"
+      shift
+      ;;
     *) break ;;
     esac
     shift
   done
+
+  echo "$@"
   args=("$@")
+
   # check required params and arguments
   [[ -z "${stack_name}" ]] && usage "Missing required parameter: stack-name"
   [[ -z "${region}" ]] && usage "Missing required parameter: region"
@@ -99,6 +108,7 @@ msg "- Region: ${region}"
 msg "- Profile: ${profile}"
 msg "- Email: ${email}"
 msg "- Role arn: ${role_arn}"
+msg "- in_venv: ${in_venv}"
 
 echo ""
 sleep 3
@@ -116,39 +126,52 @@ source_dir="$(
   pwd -P
 )"
 
-export AWS_REGION=$region
+functional_tests_dir="$source_dir/tests/functional_tests"
+echo $current_dir
+
+export REGION=$region
 export AWS_PROFILE=$profile
 export STACK=$stack_name
 export EMAIL=$email
 export ROLE_ARN=$role_arn
 
-# Remove build folder from solution helper package
+# Create a temporary Python virtualenv if no venv is active.
+source $functional_tests_dir/helper/create_venv.sh
+create_venv in_venv
+
+echo "Remove build folder from solution helper package"
 rm -r "$source_dir/cdk_solution_helper_py/helpers_common/build"
 
-#####################################################
-#####   CREATE BUCKETS FOR TEMPLATE AND ASSETS  #####
-#####################################################
-template_bucket_name="$stack_name-functional-tests"
+echo "-----------------------------------------"
+echo "CREATE BUCKETS FOR TEMPLATE AND ASSETS"
+echo "-----------------------------------------"
+template_bucket_name="$stack_name$(LC_ALL=C tr -dc a-z </dev/urandom | head -c 4)-func-tests"
 assets_bucket_name="$template_bucket_name-$region"
 echo $template_bucket_name
 echo $assets_bucket_name
-aws s3api create-bucket --bucket $template_bucket_name --region $region
-aws s3api create-bucket --bucket $assets_bucket_name --region $region
+if [[ $region == us-east-1 ]]; then
+  aws s3api create-bucket --bucket $template_bucket_name --region $region
+  aws s3api create-bucket --bucket $assets_bucket_name --region $region
+else
+  aws s3api create-bucket --bucket $template_bucket_name --region $region --create-bucket-configuration LocationConstraint=$region
+  aws s3api create-bucket --bucket $assets_bucket_name --region $region --create-bucket-configuration LocationConstraint=$region
+fi
 
-##############################################
-######   TEST STACK SYNTHESIZE & DEPLOY  #####
-##############################################
+echo "-----------------------------------------"
+echo "TEST STACK SYNTHESIZE & DEPLOY"
+echo "-----------------------------------------"
+
 cd $deployment_dir
-
+version_code="v3.0.0"
 build-s3-cdk-dist deploy \
   --source-bucket-name $template_bucket_name \
   --solution-name amcinsights \
-  --version-code v2.0.0 \
+  --version-code $version_code \
   --cdk-app-path ../source/infrastructure/app.py \
   --cdk-app-entrypoint app:build_app \
   --region $region --sync
 
-export TEMPLATE_URL="https://$template_bucket_name.s3.amazonaws.com/amcinsights/v2.0.0/amazon-marketing-cloud-insights.template"
+export TEMPLATE_URL="https://$template_bucket_name.s3.amazonaws.com/amcinsights/$version_code/amazon-marketing-cloud-insights.template"
 
 cd $current_dir
 pytest python/test_stack_creation.py -s -W ignore::DeprecationWarning -p no:cacheproviders

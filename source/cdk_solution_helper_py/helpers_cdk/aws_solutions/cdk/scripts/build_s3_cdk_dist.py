@@ -235,6 +235,8 @@ def source_code_package(ctx, ignore, solution_name):
         "**/.pytest_cache/*",
         "**/*.egg-info",
         "**/__pycache__",
+        "**/.venv/*",
+        ".crux_template.md"
     ]
     ignored.extend(ignore)
 
@@ -246,7 +248,8 @@ def source_code_package(ctx, ignore, solution_name):
         "CONTRIBUTING.md",
         "CHANGELOG.md",
         ".gitignore",
-        "solution-manifest.yaml"
+        "solution-manifest.yaml",
+        "IAM_POLICY_INSTALL.json"
     ]
 
     # copy source directory

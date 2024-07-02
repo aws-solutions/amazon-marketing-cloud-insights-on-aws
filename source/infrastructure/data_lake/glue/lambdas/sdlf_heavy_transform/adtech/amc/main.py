@@ -103,7 +103,7 @@ def get_bucket_and_key_from_s3_uri(s3_path: str) -> (str, str):
 
 def athena_sanitize_name(name: str) -> str:
     name = "".join(c for c in unicodedata.normalize("NFD", name) if unicodedata.category(c) != "Mn")  # strip accents
-    return re.sub("\W+", "_", name).lower()  # Replacing non alphanumeric characters by underscore
+    return re.sub("\W+", "_", name).lower()  # Replacing non-alphanumeric characters by underscore
 
 
 def add_partitions(outputfilebasepath, silver_catalog, list_partns, target_table_name):
@@ -327,7 +327,7 @@ def read_schema(target_table_name, silver_catalog, csv_schema, csvdf):
     # copy the old csv schema to start the new schema
     new_schema = csv_schema.copy()
 
-    # if the csv schema column matches an existing table schema column, update the csv schema to match match
+    # if the csv schema column matches an existing table schema column, update the csv schema to match
     # the table's schema
     for column in new_schema:
         if column in table_schema:
@@ -347,14 +347,17 @@ def read_schema(target_table_name, silver_catalog, csv_schema, csvdf):
                 if new_schema[c] == np.int64:
                     csvdf[c].fillna(pd.NA, inplace=True)
                     csvdf[c].replace('nan', pd.NA, inplace=True)
-                    csvdf[c] = csvdf[c].astype('float').astype('Int64')
+                    csvdf[c] = csvdf[c].astype('Float64').astype('Int64')
                 else:
                     csvdf[c] = csvdf[c].astype(new_schema[c])
                 logger.info(f'casted {c} as {new_schema[c]} to match table')
                 print(f"dtype:{csvdf[c].dtype}")
                 print(f"value is:{csvdf[c]}")
             except (TypeError, ValueError) as e:
-                logger.info(f'could not cast {c} to {new_schema[c]} to match table: {str(e)}')
+                # If error caught during conversion, there is HIVE_BAD_DATA error in Athena.
+                # The error should be raised to fail glue job.
+                logger.error(f'Could not cast {c} to {new_schema[c]} to match table: {str(e)}')
+                raise e
 
     return table_schema
 
@@ -526,13 +529,13 @@ def process_files(source_locations, output_location, kms_key, silver_catalog):
         # Iterate over the text only columns
         iterate_csvdf_cols(csvdf=csvdf, only_string_schema=only_string_schema,
                            only_nonstring_schema=only_nonstring_schema)
-    
+
         s3_output_path = f'{output_location}/{source_file_partitioned_path}/{source_file_timestamp}-{source_file_basename}.parquet'
 
         # create a dictioary that contains the CSV file's casted schema
         csv_schema = dict(zip([*csvdf.columns], [*csvdf.dtypes]))
 
-        # Try to read the schema from the destination table (if it exists) and convert the CSV inferrred schema to
+        # Try to read the schema from the destination table (if it exists) and convert the CSV inferred schema to
         # match the table schema
         table_exist = 1
         table_schema = None

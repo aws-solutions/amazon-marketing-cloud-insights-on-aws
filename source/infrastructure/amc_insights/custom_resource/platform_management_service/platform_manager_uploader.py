@@ -1,5 +1,6 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
+import uuid
 
 from constructs import Construct
 
@@ -114,6 +115,7 @@ class PlatformManagerUploader(Construct):
             properties={
                 "artifacts_bucket_name": self._solution_buckets.artifacts_bucket.bucket_name,
                 "artifacts_key_prefix": f"{self._notebook_samples_prefix}/",
+                "custom_resource_uuid": str(uuid.uuid4()) # random uuid to trigger redeploy on stack update
             },
         )
         self._platform_manager_custom_resource.node.add_dependency(self._sync_platform_manager_lambda_iam_policy)

@@ -11,13 +11,16 @@
 import os
 import sys
 import json
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch, Mock
+
+import boto3
+import pytest
 from moto import mock_aws
 
 sys.path.insert(0,
                 "./infrastructure/amc_insights/microservices/workflow_manager_service/lambda_layers/wfm_layer/python/")
 from amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface import \
-    AMCAPIResponse, AMCAPIInterface
+    AMCAPIResponse, AMCAPIs, AMCRequests, safe_json_loads, send_request, get_access_token, verify_amc_request
 from wfm_utilities import wfm_utilities
 
 
@@ -25,23 +28,22 @@ from wfm_utilities import wfm_utilities
 def test_AMCAPIResponse():
     utils_mock = MagicMock()
     utils_mock.is_json.return_value = True
-    logger_mock = MagicMock()
     response_mock = MagicMock(status=200, data=json.dumps({"status": "open"}).encode("utf-8"))
     response_mock.geturl.return_value = "https://test-url.com"
 
-    amc_class = AMCAPIResponse(utils=utils_mock, logger=logger_mock, response=response_mock)
+    amc_class = AMCAPIResponse(response=response_mock)
 
     assert amc_class.response_text == response_mock.data.decode('utf-8')
     assert amc_class.success == True
 
     response_mock = MagicMock(status=202, data=json.dumps({"status": "open"}).encode("utf-8"))
-    amc_class = AMCAPIResponse(utils=utils_mock, logger=logger_mock, response=response_mock)
+    amc_class = AMCAPIResponse(response=response_mock)
 
     assert amc_class.response_text == response_mock.data.decode('utf-8')
     assert amc_class.success == True
 
     response_mock = MagicMock(status=400, data=json.dumps({"status": "open"}).encode("utf-8"))
-    amc_class = AMCAPIResponse(utils=utils_mock, logger=logger_mock, response=response_mock)
+    amc_class = AMCAPIResponse(response=response_mock)
 
     assert amc_class.response_text == response_mock.data.decode('utf-8')
     assert amc_class.response['responseStatus'] == "FAILED"
@@ -55,186 +57,440 @@ def test_AMCAPIResponse():
     assert amc_class.response["statusCode"] == "500"
 
 
-@mock_aws
-def test_AMCAPIInterface():
-    logger = MagicMock()
-    test_arn = "arn:aws:iam::123456789012:role/Test/test_12345/test_role"
-
-    config = {
-        "invokeAmcApiRoleArn": test_arn,
-        "amcApiEndpoint": "https://test-url.com",
-        "amcRegion": os.environ["AWS_DEFAULT_REGION"]
+@pytest.fixture
+def amc_apis():
+    customer_config = {
+        "amcAmazonAdsMarketplaceId": "test_marketplace_id",
+        "amcAmazonAdsAdvertiserId": "test_advertiser_id",
+        "amcInstanceId": "test_amc_instance_id",
+        "customerId": "test_customer"
     }
+    logger = MagicMock()
     utils_obj = wfm_utilities.Utils(logger)
-    amc_interface = AMCAPIInterface(config=config, logger=logger, utils=utils_obj)
-    assert amc_interface.logger == logger
-    assert amc_interface.utils == utils_obj
-    assert amc_interface.config == config
+    amc_apis = AMCAPIs(customer_config=customer_config, wfm_utils=utils_obj)
+    return amc_apis
 
-    should_fail = amc_interface.boto3_get_session_for_role(customer_role_arn="bad_arn")
-    assert should_fail == False
 
-    should_pass = amc_interface.boto3_get_session_for_role(customer_role_arn=test_arn)
-    assert should_pass is None
+@pytest.fixture
+def ads_parameters():
+    return {'client_id': 'test_client_id', 'access_token': 'test_access_token',
+            'instance_id': 'test_amc_instance_id',
+            'marketplace_id': 'test_marketplace_id', 'advertiser_id': 'test_advertiser_id'}
 
-    apigateway = amc_interface.apigateway_get_signed_headers(
-        request_method="GET",
-        request_endpoint_url="https://test-url.com",
-        request_body="{}",
-        region="us-east-1"
+
+@mock_aws
+def test_AMCAPIs_get_execution_status_by_workflow_execution_id(amc_apis, ads_parameters):
+    with (
+        patch(
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.AMCRequests.process_request")
+        as process_request_mock,
+        patch(
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.AMCAPIs.get_ads_parameters")
+        as get_ads_parameters_mock
+    ):
+        utils_mock = MagicMock()
+        utils_mock.is_json.return_value = True
+        response_mock = MagicMock(status=200, data=json.dumps({"status": "open"}).encode("utf-8"))
+        response_mock.geturl.return_value = "https://test-url.com"
+        get_ads_parameters_mock.return_value = ads_parameters
+
+        process_request_mock.return_value = AMCAPIResponse(response_mock)
+
+        workflow_execution_id = "123456"
+        amc_response = amc_apis.get_execution_status_by_workflow_execution_id(workflow_execution_id)
+
+        process_request_mock.assert_called_with(ads_parameters)
+        #
+        assert amc_response.status_code == 200
+        assert amc_response.response_message == "open"
+
+
+def test_AMCAPIs_get_execution_status_by_minimum_create_time(amc_apis, ads_parameters):
+    with (
+        patch(
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.AMCRequests.process_request")
+        as process_request_mock,
+        patch(
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.AMCAPIs.get_ads_parameters")
+        as get_ads_parameters_mock
+    ):
+        utils_mock = MagicMock()
+        utils_mock.is_json.return_value = True
+        get_ads_parameters_mock.return_value = ads_parameters
+        response_mock = MagicMock(
+            status=200,
+            data=json.dumps({"status": "open", "executions": [{"workflowId": "111111"}]}).encode(
+                "utf-8")
+        )
+        response_mock.geturl.return_value = "https://test-url.com"
+
+        process_request_mock.return_value = AMCAPIResponse(response_mock)
+
+        amc_response = amc_apis.get_execution_status_by_minimum_create_time()
+
+        process_request_mock.assert_called_with(ads_parameters)
+
+        assert amc_response.status_code == 200
+        assert amc_response.response_message == "open"
+        assert amc_response.response["executions"] == [{"workflowId": "111111"}]
+
+
+def test_AMCAPIs_create_workflow(amc_apis, ads_parameters):
+    with (
+        patch(
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.AMCRequests.process_request")
+        as process_request_mock,
+        patch(
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.AMCAPIs.get_ads_parameters")
+        as get_ads_parameters_mock
+    ):
+        utils_mock = MagicMock()
+        utils_mock.is_json.return_value = True
+        get_ads_parameters_mock.return_value = ads_parameters
+        response_mock = MagicMock(
+            status=200,
+            data=json.dumps({"status": "open"}).encode(
+                "utf-8")
+        )
+        response_mock.geturl.return_value = "https://test-url.com"
+
+        process_request_mock.return_value = AMCAPIResponse(response_mock)
+
+        amc_response = amc_apis.create_workflow(workflow_definition={"workflowId": 12345},
+                                                update_if_already_exists=False)
+
+        process_request_mock.assert_called_with(ads_parameters)
+
+        assert amc_response.status_code == 200
+        assert amc_response.response_message == "open"
+        assert amc_response.response_status == "CREATED"
+
+
+def test_AMCAPIs_update_workflow(amc_apis, ads_parameters):
+    with (
+        patch(
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.AMCRequests.process_request")
+        as process_request_mock,
+        patch(
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.AMCAPIs.get_ads_parameters")
+        as get_ads_parameters_mock
+    ):
+        utils_mock = MagicMock()
+        utils_mock.is_json.return_value = True
+        get_ads_parameters_mock.return_value = ads_parameters
+        response_mock = MagicMock(
+            status=200,
+            data=json.dumps({"status": "open"}).encode(
+                "utf-8")
+        )
+        response_mock.geturl.return_value = "https://test-url.com"
+
+        process_request_mock.return_value = AMCAPIResponse(response_mock)
+
+        amc_response = amc_apis.update_workflow(workflow_definition={"workflowId": 12345})
+
+        process_request_mock.assert_called_with(ads_parameters)
+
+        assert amc_response.status_code == 200
+        assert amc_response.response_message == "open"
+        assert amc_response.response_status == "UPDATED"
+
+
+def test_AMCAPIs_delete_workflow(amc_apis, ads_parameters):
+    with (
+        patch(
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.AMCRequests.process_request")
+        as process_request_mock,
+        patch(
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.AMCAPIs.get_ads_parameters")
+        as get_ads_parameters_mock
+    ):
+        utils_mock = MagicMock()
+        utils_mock.is_json.return_value = True
+        get_ads_parameters_mock.return_value = ads_parameters
+        response_mock = MagicMock(
+            status=200,
+            data=json.dumps({"status": "open"}).encode(
+                "utf-8")
+        )
+        response_mock.geturl.return_value = "https://test-url.com"
+
+        process_request_mock.return_value = AMCAPIResponse(response_mock)
+
+        amc_response = amc_apis.delete_workflow(workflow_id="12345")
+
+        process_request_mock.assert_called_with(ads_parameters)
+
+        assert amc_response.status_code == 200
+        assert amc_response.response_message == "open"
+        assert amc_response.response_status == "DELETED"
+
+
+def test_AMCAPIs_get_workflow(amc_apis, ads_parameters):
+    with (
+        patch(
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.AMCAPIs.get_ads_parameters")
+        as get_ads_parameters_mock,
+        patch(
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.AMCRequests.process_request") as process_request_mock
+
+    ):
+        utils_mock = MagicMock()
+        utils_mock.is_json.return_value = True
+        get_ads_parameters_mock.return_value = ads_parameters
+        response_mock = MagicMock(
+            status=200,
+            data=json.dumps({"status": "open"}).encode(
+                "utf-8")
+        )
+        response_mock.geturl.return_value = "https://test-url.com"
+
+        process_request_mock.return_value = AMCAPIResponse(response_mock)
+
+        amc_response = amc_apis.get_workflow(workflow_id="12345")
+
+        process_request_mock.assert_called_with(ads_parameters)
+
+        assert amc_response.status_code == 200
+        assert amc_response.response_message == "open"
+        assert amc_response.response_status == "RECEIVED"
+
+
+def test_AMCAPIs_get_workflows(amc_apis, ads_parameters):
+    with (
+        patch(
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.AMCAPIs.get_ads_parameters")
+        as get_ads_parameters_mock,
+        patch(
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.AMCRequests.process_request") as process_request_mock
+
+    ):
+        utils_mock = MagicMock()
+        utils_mock.is_json.return_value = True
+        get_ads_parameters_mock.return_value = ads_parameters
+        response_mock = MagicMock(
+            status=200,
+            data=json.dumps({"status": "open"}).encode(
+                "utf-8")
+        )
+        response_mock.geturl.return_value = "https://test-url.com"
+
+        process_request_mock.return_value = AMCAPIResponse(response_mock)
+
+        amc_response = amc_apis.get_workflows()
+
+        process_request_mock.assert_called_with(ads_parameters)
+
+        assert amc_response.status_code == 200
+        assert amc_response.response_message == "open"
+        assert amc_response.response_status == "RECEIVED"
+
+
+def test_AMCAPIs_create_workflow_execution(amc_apis, ads_parameters):
+    with (
+        patch(
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.AMCAPIs.get_ads_parameters")
+        as get_ads_parameters_mock,
+        patch(
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.AMCRequests.process_request") as process_request_mock
+
+    ):
+        utils_mock = MagicMock()
+        utils_mock.is_json.return_value = True
+        get_ads_parameters_mock.return_value = ads_parameters
+        response_mock = MagicMock(
+            status=200,
+            data=json.dumps({"status": "open"}).encode(
+                "utf-8")
+        )
+        response_mock.geturl.return_value = "https://test-url.com"
+
+        process_request_mock.return_value = AMCAPIResponse(response_mock)
+
+        create_execution_request = {
+            "parameterValues": {
+                "test_time": "TODAY()"
+            },
+            "timeWindowStart": "TODAY()",
+            "timeWindowEnd": "TODAY()"
+        }
+        amc_response = amc_apis.create_workflow_execution(create_execution_request=create_execution_request)
+
+        process_request_mock.assert_called_with(ads_parameters)
+
+        assert amc_response.status_code == 200
+        assert amc_response.response_message == "open"
+
+
+def test_AMCAPIs_cancel_workflow_execution(amc_apis, ads_parameters):
+    with (
+        patch(
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.AMCAPIs.get_ads_parameters")
+        as get_ads_parameters_mock,
+        patch(
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.AMCRequests.process_request") as process_request_mock
+
+    ):
+        utils_mock = MagicMock()
+        utils_mock.is_json.return_value = True
+        get_ads_parameters_mock.return_value = ads_parameters
+        response_mock = MagicMock(
+            status=200,
+            data=json.dumps({"status": "CANCELLED"}).encode(
+                "utf-8")
+        )
+        response_mock.geturl.return_value = "https://test-url.com"
+
+        process_request_mock.return_value = AMCAPIResponse(response_mock)
+
+        amc_response = amc_apis.cancel_workflow_execution(workflow_execution_id="12345")
+
+        process_request_mock.assert_called_with(ads_parameters)
+
+        assert amc_response.status_code == 200
+        assert amc_response.response_status == "CANCELLED"
+
+
+def test_safe_json():
+    assert safe_json_loads("test") == "test"
+    assert safe_json_loads(json.dumps({"test": "123"})) == {"test": "123"}
+
+
+def test_send_request():
+    with (
+        patch(
+            "urllib3.PoolManager.request")
+        as request_mock
+    ):
+        request_mock.return_value = MagicMock(
+            status=200,
+            data=json.dumps({"status": "open"}).encode(
+                "utf-8")
+        )
+
+        send_request(request_url="https://test-url.com", headers={"header": "test_header_1"}, http_method="GET",
+                     data="test_data", query_params={"query_parameter": "test_query_parameter"})
+
+        request_mock.assert_called_with(url="https://test-url.com", headers={"header": "test_header_1"}, method="GET",
+                                        body="test_data", fields={"query_parameter": "test_query_parameter"})
+
+        send_request(request_url="https://test-url.com", headers={"header": "test_header_1"}, http_method="POST",
+                     data="test_data", query_params={"query_parameter_1": "test_query_parameter_1",
+                                                     "query_parameter_2": "test_query_parameter_2"})
+
+        request_mock.assert_called_with(
+            url="https://test-url.com?query_parameter_1=test_query_parameter_1&query_parameter_2=test_query_parameter_2",
+            headers={"header": "test_header_1"}, method="POST",
+            body="test_data")
+
+
+@mock_aws
+def test_get_access_token():
+    secret_key = os.environ["AMC_SECRETS_MANAGER"]
+    secret_values = {
+        'client_id': 'test_client_id',
+        'access_token': 'test_access_token_old',
+        'client_secret': 'test_client_secret',
+        'refresh_token': 'test_refresh_token',
+        'authorization_code': 'test_authorization_code',
+    }
+    client = boto3.client("secretsmanager")
+    client.create_secret(
+        Name=secret_key,
+        SecretString=json.dumps(secret_values)
     )
 
     with (
         patch(
-            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.AMCAPIResponse") as amc_response_mock,
-        patch(
-            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.AMCAPIInterface.apigateway_get_signed_headers") as amc_api_interface_headers_mock
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.send_request")
+        as send_request_mock
     ):
-        patch_urlib3_poolmanager = "urllib3.PoolManager"
-        amc_api_interface_headers_mock.return_value = apigateway
-        with patch(patch_urlib3_poolmanager) as mock_pool_manager:
-            mock_amc_request = mock_pool_manager.return_value
-            amc_interface.send_amc_api_request(
-                request_method="POST",
-                request_body="{}",
-                url="https://test-url.com"
+        send_request_mock.return_value = MagicMock(
+            status=200,
+            data=json.dumps({"status": "open", "access_token": "test_access_token_new"}).encode("utf-8")
+        )
+        res = get_access_token()
+
+        actual_secrets_res = client.get_secret_value(
+            SecretId=secret_key,
+        )
+        actual_secrets_values = json.loads(actual_secrets_res["SecretString"])
+        assert actual_secrets_values["access_token"] == "test_access_token_new"
+        assert res == {'client_id': 'test_client_id', 'status': 'open', 'access_token': 'test_access_token_new'}
+
+        with pytest.raises(RuntimeError):
+            send_request_mock.return_value = MagicMock(
+                status=401,
+                data=json.dumps({"status": "unauthorized"}).encode("utf-8")
             )
-            mock_pool_manager.assert_called()
-            amc_response_mock.assert_called()
-            amc_api_interface_headers_mock.assert_called()
-            mock_amc_request.request.assert_called_once_with('POST', 'https://test-url.com', body='{}',
-                                                             headers=apigateway)
+            get_access_token()
 
-        with patch(patch_urlib3_poolmanager) as mock_pool_manager:
-            mock_amc_request = mock_pool_manager.return_value
-            workflow_id = "123456"
-            amc_interface.get_execution_status_by_workflow_id(
-                workflow_id=workflow_id
-            )
-            mock_amc_request.request.assert_called_once_with('GET',
-                                                             f"{config['amcApiEndpoint']}/?workflowId={workflow_id}/",
-                                                             body="", headers=apigateway)
 
-        with patch(patch_urlib3_poolmanager) as mock_pool_manager:
-            mock_amc_request = mock_pool_manager.return_value
-            workflow_execution_id = "67890"
+def test_AMCRequests_process_request_using_valid_access_token(ads_parameters):
+    with (
+        patch(
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.send_request")
+        as send_request_mock
+    ):
+        send_request_mock.return_value = MagicMock(
+            status=200,
+            data=json.dumps({"status": "open"}).encode("utf-8")
+        )
 
-            amc_interface.get_execution_status_by_workflow_execution_id(
-                workflow_execution_id=workflow_execution_id
-            )
-            mock_pool_manager.assert_called()
-            mock_amc_request.request.assert_called_once_with('GET',
-                                                             f"{config['amcApiEndpoint']}/workflowExecutions/{workflow_execution_id}",
-                                                             body="", headers=apigateway)
+        amc_request = AMCRequests(
+            amc_path="/an_amc_request",
+            http_method="GET",
+            request_parameters={"query_param_a_key": "query_param_a_value"},
+            payload="some data"
+        )
+        actual_amc_response = amc_request.process_request(ads_parameters)
 
-        with patch(patch_urlib3_poolmanager) as mock_pool_manager:
-            mock_amc_request = mock_pool_manager.return_value
-            workflow_definition = {
-                "workflowId": 12345
-            }
+        send_request_mock.assert_called_with(
+            request_url="https://advertising-api.amazon.com/amc/reporting/test_amc_instance_id/an_amc_request",
+            headers={'Amazon-Advertising-API-ClientId': 'test_client_id', 'Authorization': 'Bearer test_access_token',
+                     'Content-Type': 'application/json', 'Amazon-Advertising-API-AdvertiserId': 'test_advertiser_id',
+                     'Amazon-Advertising-API-MarketplaceId': 'test_marketplace_id',  
+                     "x-amzn-service-name": "amazon-marketing-cloud-insights-on-aws",
+                     "x-amzn-service-version": "v99.99.99"},
+            http_method="GET",
+            data="some data",
+            query_params={'query_param_a_key': 'query_param_a_value'},
+        )
+        assert actual_amc_response.status_code == 200
 
-            amc_interface.create_workflow(
-                workflow_definition=workflow_definition,
-                update_if_already_exists=False
-            )
-            mock_pool_manager.assert_called()
-            mock_amc_request.request.assert_called_once_with('POST', f"{config['amcApiEndpoint']}/workflows",
-                                                             body='{"workflowId": 12345}', headers=apigateway)
 
-        with patch(patch_urlib3_poolmanager) as mock_pool_manager:
-            mock_amc_request = mock_pool_manager.return_value
-            amc_interface.create_workflow(
-                workflow_definition=workflow_definition,
-                update_if_already_exists=True
-            )
-            mock_pool_manager.assert_called()
-            mock_amc_request.request.assert_called_once_with('POST', f"{config['amcApiEndpoint']}/workflows",
-                                                             body='{"workflowId": 12345}', headers=apigateway)
+def test_AMCRequests_process_request_using_bad_access_token(ads_parameters):
+    with (
+        patch(
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.send_request")
+        as send_request_mock,
+        patch(
+            "amc_insights.microservices.workflow_manager_service.lambda_layers.wfm_layer.python.wfm_amc_api_interface.wfm_amc_api_interface.verify_amc_request")
+        as verify_amc_request_mock,
+    ):
+        send_request_mock.return_value = MagicMock(
+            status=401,
+            data=json.dumps({"status": "unauthorized"}).encode("utf-8")
+        )
+        verify_amc_request_mock.return_value = {"access_token": "an_new_access_token"}
 
-        with patch(patch_urlib3_poolmanager) as mock_pool_manager:
-            mock_amc_request = mock_pool_manager.return_value
-            workflow_definition = {
-                "workflowId": 12345
-            }
-            amc_interface.update_workflow(
-                workflow_definition=workflow_definition
-            )
-            mock_pool_manager.assert_called()
-            mock_amc_request.request.assert_called_once_with('PUT',
-                                                             f"{config['amcApiEndpoint']}/workflows/{workflow_definition['workflowId']}",
-                                                             body='{"workflowId": 12345}', headers=apigateway)
+        amc_request = AMCRequests(
+            amc_path="/an_amc_request",
+            http_method="GET",
+            request_parameters={"query_param_a_key": "query_param_a_value"},
+            payload="some data"
+        )
+        amc_request.process_request(ads_parameters)
 
-        with patch(patch_urlib3_poolmanager) as mock_pool_manager:
-            mock_amc_request = mock_pool_manager.return_value
-            workflow_id = "123456"
-
-            amc_interface.delete_workflow(
-                workflow_id=workflow_id
-            )
-            mock_pool_manager.assert_called()
-            mock_amc_request.request.assert_called_with('DELETE', f"{config['amcApiEndpoint']}/workflows/{workflow_id}",
-                                                        body="", headers=apigateway)
-
-        with patch(patch_urlib3_poolmanager) as mock_pool_manager:
-            mock_amc_request = mock_pool_manager.return_value
-            workflow_id = "123456"
-
-            amc_interface.get_workflow(
-                workflow_id=workflow_id
-            )
-            mock_pool_manager.assert_called()
-            mock_amc_request.request.assert_called_once_with('GET',
-                                                             f"{config['amcApiEndpoint']}/workflows/{workflow_id}",
-                                                             body="", headers=apigateway)
-
-        with patch(patch_urlib3_poolmanager) as mock_pool_manager:
-            mock_amc_request = mock_pool_manager.return_value
-            amc_interface.get_workflows()
-            mock_pool_manager.assert_called()
-            mock_amc_request.request.assert_called_once_with('GET', f"{config['amcApiEndpoint']}/workflows", body="",
-                                                             headers=apigateway)
-
-        with patch(patch_urlib3_poolmanager) as mock_pool_manager:
-            mock_amc_request = mock_pool_manager.return_value
-            create_execution_request = {
-                "parameterValues": {
-                    "test_time": "TODAY()"
-                },
-                "timeWindowStart": "TODAY()",
-                "timeWindowEnd": "TODAY()"
-            }
-
-            test_time = wfm_utilities.Utils(logger).get_current_date_with_offset(0)
-            amc_interface.create_workflow_execution(create_execution_request)
-            mock_pool_manager.assert_called()
-            test_body = {"parameterValues": {"test_time": test_time}, "timeWindowStart": test_time,
-                         "timeWindowEnd": test_time}
-            mock_amc_request.request.assert_called_once_with('POST', f"{config['amcApiEndpoint']}/workflowExecutions",
-                                                             body=json.dumps(test_body), headers=apigateway)
-
-            create_execution_request = {
-                "parameterValues": {
-                    "test_time": "NOW()"
-                },
-                "timeWindowStart": "NOW()",
-                "timeWindowEnd": "NOW()"
-            }
-            amc_interface.create_workflow_execution(create_execution_request)
-            mock_amc_request.request.assert_called()
-
-        with patch(patch_urlib3_poolmanager) as mock_pool_manager:
-            mock_amc_request = mock_pool_manager.return_value
-            workflow_execution_id = "89043"
-
-            amc_interface.cancel_workflow_execution(workflow_execution_id)
-            mock_pool_manager.assert_called()
-            mock_amc_request.request.assert_has_calls(
-                [
-                    call('GET', f"{config['amcApiEndpoint']}/workflowExecutions/{workflow_execution_id}",
-                         headers=apigateway, body=""),
-                    call('DELETE', f"{config['amcApiEndpoint']}/workflowExecutions/{workflow_execution_id}",
-                         headers=apigateway, body=""),
-                    call('GET', f"{config['amcApiEndpoint']}/workflowExecutions/{workflow_execution_id}",
-                         headers=apigateway, body="")
-                ]
-            )
+        send_request_mock.assert_called_with(
+            request_url="https://advertising-api.amazon.com/amc/reporting/test_amc_instance_id/an_amc_request",
+            headers={'Amazon-Advertising-API-ClientId': 'test_client_id', 'Authorization': 'Bearer an_new_access_token',
+                     'Content-Type': 'application/json', 'Amazon-Advertising-API-AdvertiserId': 'test_advertiser_id',
+                     'Amazon-Advertising-API-MarketplaceId': 'test_marketplace_id',
+                     "x-amzn-service-name": "amazon-marketing-cloud-insights-on-aws",
+                     "x-amzn-service-version": "v99.99.99"
+                     },
+            http_method="GET",
+            data="some data",
+            query_params={'query_param_a_key': 'query_param_a_value'},
+        )

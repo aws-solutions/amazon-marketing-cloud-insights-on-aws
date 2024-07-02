@@ -96,4 +96,3 @@ else
 fi
 
 cd $template_dir
-

@@ -30,6 +30,7 @@ source/cdk_solution_helper_py/helpers_cdk/build/*
 
 # coverage
 .coverage
+.coverage.*
 *coverage-reports*
 
 # local sonarqube

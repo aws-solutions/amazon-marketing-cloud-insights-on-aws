@@ -1,5 +1,6 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
+import uuid 
 
 from aws_cdk.aws_lambda import Runtime, Architecture
 from constructs import Construct
@@ -99,6 +100,7 @@ class UserScriptsCustomResource(Construct):
             properties={
                 "artifacts_bucket_name": self._solution_buckets.artifacts_bucket.bucket_name,
                 "artifacts_key_prefix": "user-scripts/",
+                "custom_resource_uuid": str(uuid.uuid4()) # random uuid to trigger redeploy on stack update
             },
         )
         self._user_scripts_custom_resource.node.add_dependency(self._sync_cfn_template_lambda_iam_policy)

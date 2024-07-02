@@ -28,6 +28,15 @@ def add_cfn_nag_suppressions(
         },
     )
 
+def add_cfn_guard_suppressions(
+    resource: CfnResource, suppressions: List[str]
+):
+    resource.add_metadata(
+        "guard",
+        {
+            "SuppressedRules": suppressions
+        },
+    )
 
 @jsii.implements(IAspect)
 class CfnNagSuppressAll:
@@ -47,3 +56,22 @@ class CfnNagSuppressAll:
             == self.resource_type
         ):
             add_cfn_nag_suppressions(node.node.default_child, self.suppressions)
+
+@jsii.implements(IAspect)
+class CfnGuardSuppressAll:
+    """Suppress certain cfn_guard warnings that can be ignored by this solution"""
+
+    def __init__(self, suppress: List[str], resource_type: str):
+        self.suppressions = suppress
+        self.resource_type = resource_type
+
+    def visit(self, node: IConstruct):
+        if "is_cfn_element" in dir(node) and node.is_cfn_element(node):
+            if getattr(node, "cfn_resource_type", None) == self.resource_type:
+                add_cfn_guard_suppressions(node, self.suppressions)
+
+        elif "is_cfn_element" in dir(node.node.default_child) and (
+            getattr(node.node.default_child, "cfn_resource_type", None)
+            == self.resource_type
+        ):
+            add_cfn_guard_suppressions(node.node.default_child, self.suppressions)

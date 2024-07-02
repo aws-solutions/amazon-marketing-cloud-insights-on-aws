@@ -1,9 +1,12 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import os
 import boto3
 import time
 
 AWS_PROFILE = os.environ["AWS_PROFILE"]
-AWS_REGION = os.environ["AWS_REGION"]
+AWS_REGION = os.environ["REGION"]
 STACK = os.environ["STACK"]
 TEMPLATE_URL = os.environ["TEMPLATE_URL"]
 EMAIL = os.environ["EMAIL"]
@@ -11,11 +14,11 @@ ROLE_ARN = os.environ["ROLE_ARN"]
 
 boto3_session = boto3.session.Session(profile_name=AWS_PROFILE, region_name=AWS_REGION)
 
-cfn_client = boto3_session.client('cloudformation')
+cfn_client = boto3_session.client('cloudformation', region_name=AWS_REGION)
 
 
 def test_create_stack():
-    print(f"\nCreating stack: {STACK}")
+    print(f"\nCreating stack in region {AWS_REGION}: {STACK}")
 
     response = cfn_client.create_stack(
         StackName=STACK,

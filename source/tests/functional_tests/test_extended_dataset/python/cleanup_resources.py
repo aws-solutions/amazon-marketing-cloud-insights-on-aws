@@ -1,3 +1,6 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import os
 import shutil
 from configure_extended_dataset import read_dataset_config, write_dataset_config, TestDatasetParameters, \

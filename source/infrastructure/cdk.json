@@ -27,9 +27,9 @@
             "aws-cn"
         ],
         "@aws-cdk/aws-s3:serverAccessLogsUseBucketPolicy": true,
-        "SOLUTION_NAME": "Amazon Marketing Cloud Insights",
+        "SOLUTION_NAME": "Amazon Marketing Cloud Insights on AWS",
         "SOLUTION_ID": "SO0193",
-        "SOLUTION_VERSION": "v2.0.3",
+        "SOLUTION_VERSION": "v3.0.0",
         "METRICS_NAMESPACE": "amcinsights",
         "BUCKET_NAME": "BUCKET_NAME"
     }

@@ -239,12 +239,12 @@ class SDLFHeavyTransform(Construct):
         self._process_lambda.node.add_dependency(self._foundations_resources.wrangler_layer)
         self._check_job_lambda.node.add_dependency(self._foundations_resources.wrangler_layer)
 
-        lambda_functions = [self._routing_lambda, self._postupdate_lambda, self._check_job_lambda,
+        self.lambda_functions = [self._routing_lambda, self._postupdate_lambda, self._check_job_lambda,
                             self._process_lambda, self._error_lambda, self._redrive_lambda]
 
-        self._add_layers(lambda_functions)
+        self._add_layers(self.lambda_functions)
 
-        self._attach_policy_to_lambda_roles(team, pipeline, lambda_functions)
+        self._attach_policy_to_lambda_roles(team, pipeline, self.lambda_functions)
 
     def _add_layers(self, lambda_functions):
         self._process_lambda.add_layers(self._foundations_resources.wrangler_layer)

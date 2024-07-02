@@ -64,7 +64,10 @@ def customer_details():
             "endpoint_url": "https://abc1234567.execute-api.us-east-1.amazonaws.com/beta",
             "aws_orange_account_id": "12390",
             "aws_red_account_id": "33333",
-            "bucket_name": "test_bucket"
+            "bucket_name": "test_bucket",
+            "instance_id": "amc122345",
+            "amazon_ads_advertiser_id": "12345",
+            "amazon_ads_marketplace_id": "12345"
         },
         "customer_id": "12345",
         "customer_name": "some_cust_test_name",
@@ -79,15 +82,6 @@ def test_json_encoder_default():
     assert "2" == json_encoder_default(int(2))
 
 
-def test_get_amc_regions():
-    from amc_insights.microservices.tenant_provisioning_service.lambdas.InvokeTPSInitializeSM.handler import \
-        get_amc_region
-
-    get_amc_region("test-url.com") == None
-
-    assert "us-east-1" == get_amc_region("https://abc1234567.execute-api.us-east-1.amazonaws.com/beta")
-
-
 def test_format_payload(customer_details):
     from amc_insights.microservices.tenant_provisioning_service.lambdas.InvokeTPSInitializeSM.handler import \
         format_payload
@@ -100,10 +94,7 @@ def test_format_payload(customer_details):
     assert test_payload["amcOrangeAwsAccount"] == customer_details["amc"]["aws_orange_account_id"]
     assert test_payload["BucketName"] == customer_details["amc"]["bucket_name"]
     assert test_payload["amcDatasetName"] == os.environ['DATASET_NAME']
-    assert test_payload["amcApiEndpoint"] == customer_details["amc"]["endpoint_url"]
     assert test_payload["amcTeamName"] == os.environ['TEAM_NAME']
-    assert test_payload["amcRegion"] == "us-east-1"
-    assert test_payload["amcRedAwsAccount"] == customer_details["amc"]["aws_red_account_id"]
     assert test_payload["bucketExists"] == "true"
     assert test_payload["bucketAccount"] == os.environ['APPLICATION_ACCOUNT']
     assert test_payload["bucketRegion"] == os.environ['APPLICATION_REGION']

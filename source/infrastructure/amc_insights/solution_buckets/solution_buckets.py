@@ -6,6 +6,7 @@ import aws_cdk.aws_kms as kms
 import aws_cdk as cdk
 from aws_cdk.aws_s3 import BlockPublicAccess, BucketAccessControl
 import aws_cdk.aws_s3 as s3
+import aws_cdk.aws_iam as iam
 
 from aws_solutions.cdk.cfn_nag import add_cfn_nag_suppressions, CfnNagSuppression
 
@@ -20,16 +21,17 @@ class SolutionBuckets(Construct):
 
         self.logging_bucket_key = kms.Key(
             self,
-            id="logging-bucket-key",
-            description="Logging Bucket Key",
+            id="cloudtrail-bucket-key",
+            description="CloudTrail Bucket Key",
             enable_key_rotation=True,
             pending_window=cdk.Duration.days(30),
             removal_policy=cdk.RemovalPolicy.RETAIN,
         )
 
+        # This bucket stores CloudTrail data events
         self.logging_bucket = s3.Bucket(
             self,
-            id="logging",
+            id="cloudtrail",
             encryption_key=self.logging_bucket_key,
             access_control=BucketAccessControl.BUCKET_OWNER_FULL_CONTROL,
             block_public_access=BlockPublicAccess.BLOCK_ALL,

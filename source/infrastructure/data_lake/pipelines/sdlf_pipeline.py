@@ -4,14 +4,13 @@
 import os
 from pathlib import Path
 from constructs import Construct
-import aws_cdk as cdk
 import aws_cdk.aws_events as events
-from aws_cdk import Aws, Duration
+from aws_cdk import Duration
 import aws_cdk.aws_events_targets as targets
 from aws_cdk.aws_iam import Effect, PolicyStatement, ServicePrincipal, Policy
 from aws_cdk.aws_lambda import Code, LayerVersion, Function, Runtime
 import aws_cdk.aws_lambda as lambda_
-from aws_cdk import Aws, Aspects, CfnCondition
+from aws_cdk import Aws, Aspects
 from amc_insights.condition_aspect import ConditionAspect
 from aws_cdk.aws_ssm import StringParameter
 
@@ -46,29 +45,29 @@ class SDLFPipelineConstruct(Construct):
         self._resource_prefix = Aws.STACK_NAME
         self._environment_id: str = environment_id
         self._team = team
-        self._pipeline = pipeline
+        self.pipeline = pipeline
         self._foundations_resources = foundations_resources
 
         # Simple single-dataset pipeline with static config
         self._create_sdlf_pipeline(
             team=self._team,
-            pipeline=self._pipeline,
+            pipeline=self.pipeline,
             foundations_resources=self._foundations_resources
         )
 
     def _create_sdlf_pipeline(self, team, pipeline, foundations_resources) -> None:
         # Routing function
         self._create_lamda_layer()
-        self._routing_function = self._create_routing_lambda()
+        self.routing_function = self._create_routing_lambda()
 
         # S3 Event Capture (Raw Bucket)
         self._create_s3_event_capture(
             bucket_name=self._foundations_resources.raw_bucket.bucket_name,
-            lambda_event_target=self._routing_function
+            lambda_event_target=self.routing_function
         )
 
         # Stage A
-        self._stage_a_transform = SDLFLightTransform(
+        self.stage_a_transform = SDLFLightTransform(
             self,
             id="sdlf-stage-a",
             resource_prefix=self._resource_prefix,
@@ -94,11 +93,11 @@ class SDLFPipelineConstruct(Construct):
             "stage-a-role-name",
             parameter_name=f"/{self._resource_prefix}/Lambda/StageARoleName",
             simple_name=True,
-            string_value=self._stage_a_transform._process_lambda.role.role_name,
+            string_value=self.stage_a_transform._process_lambda.role.role_name,
         )
 
         # Stage B
-        self._stage_b_transform = SDLFHeavyTransform(
+        self.stage_b_transform = SDLFHeavyTransform(
             self,
             id="sdlf-stage-b",
             resource_prefix=self._resource_prefix,
@@ -185,6 +184,7 @@ class SDLFPipelineConstruct(Construct):
                 "dynamodb:GetItem",
                 "dynamodb:PutItem",
                 "dynamodb:UpdateItem",
+                "dynamodb:DeleteItem"
             ],
             resources=[
                 self._foundations_resources.customer_config_table.table_arn,

@@ -37,16 +37,9 @@ def on_create_or_update(event, _) -> None:
 @helper.delete
 def on_delete(event, _):
     """
-    This function is responsible for removing the glue script of sdlf heavy transform from the s3 artifact bucket.
+    This function takes no action when the custom resource is deleted as the bucket and contents are retained.
     """
-    logger.info(f"Custom Resource marked for deletion: {event['PhysicalResourceId']}")
-    resource_properties = event["ResourceProperties"]
-    try:
-        delete_bucket_contents(resource_properties)
-    except Exception as err:
-        logger.error(err)
-        raise err
-    logger.info("Glue script of sdlf heavy transform is deleted.")
+    logger.info("Custom Resource marked for deletion. No Action needed.")
 
 
 def delete_bucket_contents(resource_properties) -> None:

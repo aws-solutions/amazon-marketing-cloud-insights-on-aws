@@ -26,9 +26,7 @@ def launch_stack(event):
 
         stack_name = tps_deploy_patterns.stack_name
         template_params = tps_deploy_patterns.template_params
-        template_pattern = tps_deploy_patterns.template_pattern
-        template_url = TEMPLATE_URL
-        template_url = template_url + "/" + template_pattern
+        template_url = TEMPLATE_URL + "/" + tps_deploy_patterns.template_pattern
 
         logger.info(f'template_url: {template_url}')
 
@@ -84,49 +82,31 @@ def launch_stack(event):
                     'ParameterValue': 'false',
                 },
                 {
-                    'ParameterKey': 'pSkipAPIRoles',
-                    'ParameterValue': 'true',
-                },
-                {
                     'ParameterKey': 'pSkipDatalakeTrigger',
                     'ParameterValue': 'true',
                 },
                 {
                     'ParameterKey': 'pSkipSnsTopic',
                     'ParameterValue': 'true'
-                }
+                },
             ]
             base_params.extend(add_params)
+
             stack_resp = tps_deploy_patterns.deploy_stack(
                 stack_name=f"{stack_name}-crossregion",
                 template_url=template_url,
                 parameters=base_params,
                 region=tps_deploy_patterns._bucket_region
             )
-
-        if tps_deploy_patterns._red_room_account != tps_deploy_patterns._application_account:
-            microservice_template_obj = tps_deploy_patterns.create_cross_account_wfm_template()
-            upload_template(
-                template=microservice_template_obj.template_string,
-                bucket_name=tps_deploy_patterns._artifacts_bucket_name,
-                file_name=f"{tps_deploy_patterns._red_room_account}/wfm/cross-account-wfm-{tps_deploy_patterns._event['TenantName']}.json"
-            )
-            update_bucket_policy(
-                bucket_name=tps_deploy_patterns._artifacts_bucket_name,
-                account=tps_deploy_patterns._red_room_account,
-                artifacts_bucket=tps_deploy_patterns._artifacts_bucket_name
-            )
-            update_key_policy(
-                key_id=tps_deploy_patterns._artifacts_bucket_key_id,
-                account_id=tps_deploy_patterns._red_room_account
-            )
+            
+        if customer_type in ("standard", "cross-region") and tps_deploy_patterns._bucket_exists == 'false':
+            tps_deploy_patterns.check_and_deploy_access_logs_bucket()
 
         return stack_resp
 
     else:
         logger.info('Nothing to create/update. Missing input parameters')
         return 'no activity'
-
 
 def check_tps_deploy_patterns(tps_deploy_patterns):
     # Check if data lake is enabled
@@ -137,7 +117,7 @@ def check_tps_deploy_patterns(tps_deploy_patterns):
     if tps_deploy_patterns.check_sns_create():
         tps_deploy_patterns.template_params.extend(tps_deploy_patterns.sns_create_params)
 
-        # Check if cross-account deployment
+    # Check if cross-account deployment
     if tps_deploy_patterns.check_cross_account():
         logger.info("Cross account customer detected")
         customer_type = "cross-account"
@@ -175,7 +155,6 @@ def update_bucket_policy(bucket_name, account, artifacts_bucket):
         },
         'Action': ['s3:GetObject'],
         'Resource': [
-            f'arn:aws:s3:::{artifacts_bucket}/tps/scripts/adtech/scripts/cross-account/{account}/wfm/*',
             f'arn:aws:s3:::{artifacts_bucket}/tps/scripts/adtech/scripts/cross-account/{account}/data-lake/*'
         ]
     }

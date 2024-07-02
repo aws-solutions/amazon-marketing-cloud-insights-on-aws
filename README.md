@@ -50,8 +50,7 @@ the AWS Well-Architected Framework.
 
 ### IAM Roles for Installation and Operation
 
-The IAM policies required to install the solution are listed within
-the `IAM_POLICY_INSTALL.json` file. The IAM policies required to operate the solution are generated dynamically on stack deployment in the `IAM_POLICY_OPERATE.json` file. A link to this policy can be found in the Outputs window of your Cloudformation stack after deploying. Note: the policy generated should be used as a guide. Please review it as it may need to be amended in order to fit your specific use case.
+An IAM policy for installing the solution is listed within the `IAM_POLICY_INSTALL.json` file. An IAM policy for operating the solution is created on stack deployment with a name prefix of `{stack-name}-adminpolicy`. A link to this policy can be found in the Outputs window of your Cloudformation stack under the AdminPolicyOutput key. Note: the policy generated should be used as a guide. Please review it as it may need to be amended in order to fit your specific use case.
 
 These JSON files can be used to create a JSON policy in AWS IAM to scope the actions available to a user so they can install and operate the solution.
 
@@ -144,7 +143,7 @@ export REGION_NAME=my-region
 build-s3-cdk-dist deploy \
   --source-bucket-name $DIST_BUCKET_PREFIX \
   --solution-name $SOLUTION_NAME \
-  --version_code $VERSION \
+  --version-code $VERSION \
   --cdk-app-path ../source/infrastructure/app.py \
   --cdk-app-entrypoint app:build_app \
   --region $REGION_NAME \

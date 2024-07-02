@@ -47,23 +47,3 @@ def _mock_clients(monkeypatch, _mock_s3_client):
 def test_on_create_or_update(lambda_event, _mock_clients, caplog):
     on_create_or_update(lambda_event, None)
     assert 'Move glue script of sdlf heavy transform to S3 artifacts bucket' in caplog.text
-
-
-@pytest.mark.parametrize(
-    "lambda_event",
-    [
-        {
-            "ResourceProperties":
-                {
-                    "artifacts_bucket_name": "artifacts_bucket",
-                    "artifacts_object_key": _glue_script_path,
-                    "glue_script_file": _glue_script_local_file_path,
-                },
-            "RequestType": "Delete",
-            "PhysicalResourceId": "id",
-        }
-    ],
-)
-def test_on_delete(lambda_event, _mock_clients, caplog):
-    on_delete(lambda_event, None)
-    assert "Deleted" in caplog.text

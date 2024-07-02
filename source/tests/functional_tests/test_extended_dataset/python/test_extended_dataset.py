@@ -7,6 +7,7 @@ import time
 from .configure_extended_dataset import TestDatasetParameters
 
 AWS_PROFILE = os.environ["AWS_PROFILE"]
+REGION = os.environ["REGION"]
 MOCK_DATA_DIR = os.environ["MOCK_DATA_DIR"]
 STACK = os.environ["STACK"]
 RAW_BUCKET = os.environ["RAW_BUCKET"]
@@ -14,7 +15,7 @@ STAGE_BUCKET = os.environ["STAGE_BUCKET"]
 dataset = TestDatasetParameters.dataset
 team = 'adtech'
 
-boto3_session = boto3.session.Session(profile_name=AWS_PROFILE)
+boto3_session = boto3.session.Session(profile_name=AWS_PROFILE, region_name=REGION)
 s3 = boto3_session.resource('s3')
 s3_client = boto3_session.client('s3')
 

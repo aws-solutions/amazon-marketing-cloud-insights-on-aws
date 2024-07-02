@@ -28,10 +28,10 @@ def _mock_imports():
     mock_wfm_amc_api_interface = MagicMock()
     sys.modules['wfm_amc_api_interface'] = mock_wfm_amc_api_interface
     mock_wfm_amc_api_interface.wfm_amc_api_interface.AMCAPIResponse.return_value = MagicMock()
-    mock_wfm_amc_api_interface.wfm_amc_api_interface.AMCAPIInterface.return_value = MagicMock(
+    mock_wfm_amc_api_interface.wfm_amc_api_interface.AMCAPIs.return_value = MagicMock(
         config={"customerId": 12345})
 
-    mock_wfm_amc_api_interface.wfm_amc_api_interface.AMCAPIInterface.return_value.cancel_workflow_execution.return_value = MagicMock(
+    mock_wfm_amc_api_interface.wfm_amc_api_interface.AMCAPIs.return_value.cancel_workflow_execution.return_value = MagicMock(
         success=True, response={'workflowExecutionId': "6789", "workflowId": "12345"})
 
     mocked_cloudwatch_metrics = MagicMock()
@@ -52,9 +52,6 @@ def lambda_context():
     [
         {
             "customerConfig": {
-                "invokeAmcApiRoleArn": "arn:aws:iam::123456789012:role/Test/test_12345/test_role",
-                "amcApiEndpoint": "https://test-url.com",
-                "amcRegion": os.environ["AWS_DEFAULT_REGION"]
             },
             "executionRequest": {
                 "workflowExecutionId": "12345"
@@ -66,7 +63,7 @@ def test_handler(lambda_event, lambda_context, _mock_imports):
     from amc_insights.microservices.workflow_manager_service.lambdas.CancelWorkflowExecution.handler import handler
     event = handler(lambda_event, lambda_context)
     assert event == {
-        'customerConfig': {'invokeAmcApiRoleArn': 'arn:aws:iam::123456789012:role/Test/test_12345/test_role',
-                           'amcApiEndpoint': 'https://test-url.com', 'amcRegion': 'us-east-1'},
+        'customerConfig': {
+                            },
         'executionRequest': {'workflowExecutionId': '6789'}, 'EXECUTION_RUNNING_LAMBDA_NAME': 'lambda-function-name',
         'workflowExecutionId': '6789', 'workflowId': '12345'}

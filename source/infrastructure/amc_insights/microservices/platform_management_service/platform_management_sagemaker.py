@@ -66,7 +66,7 @@ class PlatformManagerSageMaker(Construct):
         self._sagemaker_kms_key = kms.Key(
             self,
             id=f"{self.microservice_name}-table-key",
-            description=f"{self.microservice_name.title()} Table Key",
+            description=f"{self.microservice_name.title()} Notebook Key",
             alias=f"alias/{self._resource_prefix}-pmn-sagemaker-cmk",
             enable_key_rotation=True,
             pending_window=Duration.days(30),
@@ -106,7 +106,8 @@ class PlatformManagerSageMaker(Construct):
                             self._workflow_manager_resources.lambda_invoke_workflow_sm.function_arn,
                             self._workflow_manager_resources.lambda_create_workflow_schedule.function_arn,
                             self._workflow_manager_resources.lambda_delete_workflow_schedule.function_arn,
-                            self._tenant_provisioning_resources._lambda_invoke_tps_initialize_sm.function_arn
+                            self._tenant_provisioning_resources.lambda_invoke_tps_initialize_sm.function_arn,
+                            self._workflow_manager_resources.lambda_amc_auth.function_arn
                         ],
                     ),
                     # give sagemaker permission to copy the platform manager files from the foundations artifact bucket
@@ -179,8 +180,9 @@ class PlatformManagerSageMaker(Construct):
                     INVOKE_WORKFLOW_EXECUTION_SM_NAME="INVOKE_WORKFLOW_EXECUTION_SM_NAME={self._workflow_manager_resources.lambda_invoke_workflow_execution_sm.function_name}"
                     INVOKE_WORKFLOW_SM_NAME="INVOKE_WORKFLOW_SM_NAME={self._workflow_manager_resources.lambda_invoke_workflow_sm.function_name}"
                     CREATE_WORKFLOW_SCHEDULE_NAME="CREATE_WORKFLOW_SCHEDULE_NAME={self._workflow_manager_resources.lambda_create_workflow_schedule.function_name}"
-                    INVOKE_TPS_SM_NAME="INVOKE_TPS_SM_NAME={self._tenant_provisioning_resources._lambda_invoke_tps_initialize_sm.function_name}"
+                    INVOKE_TPS_SM_NAME="INVOKE_TPS_SM_NAME={self._tenant_provisioning_resources.lambda_invoke_tps_initialize_sm.function_name}"
                     DELETE_WORKFLOW_SCHEDULE_NAME="DELETE_WORKFLOW_SCHEDULE_NAME={self._workflow_manager_resources.lambda_delete_workflow_schedule.function_name}"
+                    AMC_AUTH_LAMBDA_NAME="AMC_AUTH_LAMBDA_NAME={self._workflow_manager_resources.lambda_amc_auth.function_name}"
                     REGION="REGION={Aws.REGION}"
                     RULE_PREFIX="RULE_PREFIX={self._resource_prefix}"
 
@@ -198,6 +200,7 @@ class PlatformManagerSageMaker(Construct):
                     grep -qF "$CREATE_WORKFLOW_SCHEDULE_NAME" "$FILE" || echo "$CREATE_WORKFLOW_SCHEDULE_NAME" >> "$FILE"
                     grep -qF "$INVOKE_TPS_SM_NAME" "$FILE" || echo "$INVOKE_TPS_SM_NAME" >> "$FILE"
                     grep -qF "$DELETE_WORKFLOW_SCHEDULE_NAME" "$FILE" || echo "$DELETE_WORKFLOW_SCHEDULE_NAME" >> "$FILE"
+                    grep -qF "$AMC_AUTH_LAMBDA_NAME" "$FILE" || echo "$AMC_AUTH_LAMBDA_NAME" >> "$FILE"
                     grep -qF "$REGION" "$FILE" || echo "$REGION" >> "$FILE"
                     grep -qF "$RULE_PREFIX" "$FILE" || echo "$RULE_PREFIX" >> "$FILE"
 
@@ -211,7 +214,7 @@ class PlatformManagerSageMaker(Construct):
                     echo "Fetching the autostop script"
                     wget https://raw.githubusercontent.com/aws-samples/amazon-sagemaker-notebook-instance-lifecycle-config-samples/master/scripts/auto-stop-idle/autostop.py
                     echo "Starting the SageMaker autostop script in cron"
-                    (crontab -l 2>/dev/null; echo "*/5 * * * * $(which python) $PWD/autostop.py --time 900 --ignore-connections >> /var/log/autostop.log 2>&1") | crontab -
+                    (crontab -l 2>/dev/null; echo "*/5 * * * * $(which python) $PWD/autostop.py --time 3600 --ignore-connections >> /var/log/autostop.log 2>&1") | crontab -
 
                     # Remove lost+found folder
                     rm -rf /home/ec2-user/SageMaker/lost+found

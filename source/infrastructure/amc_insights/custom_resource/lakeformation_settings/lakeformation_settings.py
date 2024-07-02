@@ -20,7 +20,7 @@ class LakeformationSettings(Construct):
             self,
             scope,
             id,
-            dataset_resources: List[SDLFDatasetConstruct],
+            dataset_resources,
             pmn_resources,
             datalake_condition,
             microservice_condition
