@@ -43,7 +43,7 @@ class IntegrationConstruct(Construct):
             self, "postDeployMetadataInstanceIntegrationConfigPolicy",
             statements=[kms_policy_statement]
         )
-        kms_policy.attach_to_role(self._tenant_provisioning_resources._amc_instance_post_deploy_metadata.role)
+        kms_policy.attach_to_role(self._tenant_provisioning_resources.amc_instance_post_deploy_metadata.role)
 
         lambda_policy_statement = PolicyStatement(
                     effect=Effect.ALLOW,
@@ -51,13 +51,13 @@ class IntegrationConstruct(Construct):
                         "lambda:AddPermission",
                         "lambda:RemovePermission"
                     ],
-                    resources=[self._insights_pipeline_resources._routing_function.function_arn], 
+                    resources=[self._insights_pipeline_resources.routing_function.function_arn],
         )
         lambda_policy = Policy(
             self, "routingQueueLambdaIntegrationPolicy",
             statements=[lambda_policy_statement]
         )
-        lambda_policy.attach_to_role(self._tenant_provisioning_resources._add_amc_instance.role)
+        lambda_policy.attach_to_role(self._tenant_provisioning_resources.add_amc_instance.role)
 
         dynamodb_policy = Policy(
             self, 'SDLFCustomerConfigIntegrationPolicy',
@@ -80,4 +80,4 @@ class IntegrationConstruct(Construct):
                 )
             ]
         )
-        dynamodb_policy.attach_to_role(self._tenant_provisioning_resources._amc_instance_post_deploy_metadata.role)
+        dynamodb_policy.attach_to_role(self._tenant_provisioning_resources.amc_instance_post_deploy_metadata.role)

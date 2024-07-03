@@ -4,16 +4,18 @@
 import os
 from pathlib import Path
 from aws_cdk.aws_lambda import LayerVersion
-from aws_cdk.aws_iam import Effect, PolicyStatement, ServicePrincipal, Policy, Role
+from aws_cdk.aws_iam import Effect, PolicyStatement, ServicePrincipal, Policy, Role, AccountRootPrincipal, \
+    PolicyDocument
 import aws_cdk as cdk
 from aws_cdk.aws_sns import Topic
 from aws_cdk import aws_dynamodb as dynamodb
 import aws_cdk.aws_kms as kms
 import aws_cdk.aws_lambda as _lambda
 import aws_cdk.aws_logs as logs
+import aws_cdk.aws_secretsmanager as secrets_manager
 from aws_cdk.aws_sns_subscriptions import EmailSubscription
 from constructs import Construct
-from aws_cdk import Aws, Aspects, CfnCondition, Fn, CfnOutput
+from aws_cdk import Aws, Aspects, CfnCondition, Fn, CfnOutput, SecretValue, RemovalPolicy, Duration
 from aws_cdk import aws_stepfunctions as stepfunctions
 from aws_cdk import aws_stepfunctions_tasks as tasks
 from amc_insights.condition_aspect import ConditionAspect
@@ -22,6 +24,8 @@ from aws_solutions.cdk.cfn_nag import CfnNagSuppression, CfnNagSuppressAll
 from aws_solutions.cdk.aws_lambda.layers.aws_lambda_powertools import PowertoolsLayer
 
 CONCURRENT_WORKFLOW_EXECUTION_LIMIT = 10
+
+
 class WorkFlowManagerService(Construct):
 
     def __init__(
@@ -43,6 +47,91 @@ class WorkFlowManagerService(Construct):
         self._team = team
         self._resource_prefix = Aws.STACK_NAME
         self._sns_email = email_parameter.value_as_string
+
+        ##########################
+        #    OAUTH RESOURCES     #
+        ##########################
+        amc_secrets_manager_key_policy_document = PolicyDocument(
+            statements=[
+                PolicyStatement(
+                    sid="Allow administration of the key",
+                    effect=Effect.ALLOW,
+                    principals=[AccountRootPrincipal()],
+                    actions=["kms:*"],
+                    resources=["*"],
+                ),
+                PolicyStatement(
+                    effect=Effect.ALLOW,
+                    principals=[AccountRootPrincipal()],
+                    actions=["kms:Decrypt",
+                             "kms:Encrypt",
+                             "kms:ReEncrypt*",
+                             "kms:GenerateDataKey*"
+                             ],
+                    resources=["*"],
+                    conditions={
+                        "StringEquals": {
+                            "kms:CallerAccount": Aws.ACCOUNT_ID,
+                            "kms:ViaService": f"secretsmanager.{Aws.REGION}.amazonaws.com",
+                        },
+                        "StringLike": {
+                            "kms:EncryptionContext:SecretARN": [
+                                f"arn:aws:secretsmanager:{Aws.REGION}:{Aws.ACCOUNT_ID}:secret:{self._resource_prefix}*"
+                            ]
+                        }
+                    }
+                ),
+                PolicyStatement(
+                    effect=Effect.ALLOW,
+                    principals=[AccountRootPrincipal()],
+                    actions=["kms:CreateGrant",
+                             "kms:DescribeKey"
+                             ],
+                    resources=["*"],
+                    conditions={
+                        "StringEquals": {
+                            "kms:CallerAccount": Aws.ACCOUNT_ID,
+                            "kms:ViaService": f"secretsmanager.{Aws.REGION}.amazonaws.com"
+                        },
+                        "StringLike": {
+                            "kms:EncryptionContext:SecretARN": [
+                                f"arn:aws:secretsmanager:{Aws.REGION}:{Aws.ACCOUNT_ID}:secret:{self._resource_prefix}*"
+                            ]
+                        }
+                    }
+                ),
+            ]
+        )
+
+        self.amc_secrets_manager_key = kms.Key(
+            self,
+            "SecretKey",
+            removal_policy=RemovalPolicy.DESTROY,
+            description="OAuth Creds Secrets Manager Key",
+            enable_key_rotation=True,
+            policy=amc_secrets_manager_key_policy_document,
+            pending_window=Duration.days(30),
+        )
+        self.amc_secrets_manager = secrets_manager.Secret(
+            self,
+            "Secret",
+            encryption_key=self.amc_secrets_manager_key,
+            removal_policy=RemovalPolicy.DESTROY,
+            secret_object_value={
+                "client_id": SecretValue.plain_text(""),
+                "client_secret": SecretValue.plain_text(""),
+                "authorization_code": SecretValue.plain_text(""),
+                "refresh_token": SecretValue.plain_text(""),
+                "access_token": SecretValue.plain_text("")
+            },
+        )
+        CfnOutput(
+            self,
+            "AMCSecrets",
+            description="Use this link to access the Secrets Manager",
+            value=f"https://{Aws.REGION}.console.aws.amazon.com/secretsmanager/secret?name={self.amc_secrets_manager.secret_name}&region={Aws.REGION}",
+            condition=creating_resources_condition,
+        )
 
         ##################################
         #            KMS                 #
@@ -303,7 +392,9 @@ class WorkFlowManagerService(Construct):
                 "SOLUTION_VERSION": self.node.try_get_context("SOLUTION_VERSION"),
                 "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),
                 "EXECUTION_STATUS_TABLE": self.dynamodb_execution_status_table.table_name,
-                "RESOURCE_PREFIX": self._resource_prefix
+                "RESOURCE_PREFIX": self._resource_prefix,
+                "REGION": Aws.REGION,
+                "AMC_SECRETS_MANAGER": self.amc_secrets_manager.secret_name,
             },
             layers=[
                 self.powertools_layer,
@@ -339,7 +430,9 @@ class WorkFlowManagerService(Construct):
                 "SOLUTION_ID": self.node.try_get_context("SOLUTION_ID"),
                 "SOLUTION_VERSION": self.node.try_get_context("SOLUTION_VERSION"),
                 "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),
-                "RESOURCE_PREFIX": self._resource_prefix
+                "RESOURCE_PREFIX": self._resource_prefix,
+                "REGION": Aws.REGION,
+                "AMC_SECRETS_MANAGER": self.amc_secrets_manager.secret_name,
             },
             layers=[
                 self.powertools_layer,
@@ -369,7 +462,9 @@ class WorkFlowManagerService(Construct):
                 "SOLUTION_VERSION": self.node.try_get_context("SOLUTION_VERSION"),
                 "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),
                 "EXECUTION_STATUS_TABLE": self.dynamodb_execution_status_table.table_name,
-                "RESOURCE_PREFIX": self._resource_prefix
+                "RESOURCE_PREFIX": self._resource_prefix,
+                "REGION": Aws.REGION,
+                "AMC_SECRETS_MANAGER": self.amc_secrets_manager.secret_name,
             },
             layers=[
                 self.powertools_layer,
@@ -404,7 +499,9 @@ class WorkFlowManagerService(Construct):
                 "SOLUTION_VERSION": self.node.try_get_context("SOLUTION_VERSION"),
                 "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),
                 "EXECUTION_STATUS_TABLE": self.dynamodb_execution_status_table.table_name,
-                "RESOURCE_PREFIX": self._resource_prefix
+                "RESOURCE_PREFIX": self._resource_prefix,
+                "REGION": Aws.REGION,
+                "AMC_SECRETS_MANAGER": self.amc_secrets_manager.secret_name,
             },
             layers=[
                 self.powertools_layer,
@@ -439,6 +536,8 @@ class WorkFlowManagerService(Construct):
                 "SOLUTION_VERSION": self.node.try_get_context("SOLUTION_VERSION"),
                 "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),
                 "WORKFLOWS_TABLE_NAME": self.dynamodb_workflows_table.table_name,
+                "REGION": Aws.REGION,
+                "AMC_SECRETS_MANAGER": self.amc_secrets_manager.secret_name,
                 "RESOURCE_PREFIX": self._resource_prefix
             },
             layers=[
@@ -474,6 +573,8 @@ class WorkFlowManagerService(Construct):
                 "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),
                 "RESOURCE_PREFIX": self._resource_prefix,
                 "WORKFLOWS_TABLE_NAME": self.dynamodb_workflows_table.table_name,
+                "REGION": Aws.REGION,
+                "AMC_SECRETS_MANAGER": self.amc_secrets_manager.secret_name,
             },
             layers=[
                 self.powertools_layer,
@@ -509,6 +610,8 @@ class WorkFlowManagerService(Construct):
                 "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),
                 "RESOURCE_PREFIX": self._resource_prefix,
                 "WORKFLOWS_TABLE_NAME": self.dynamodb_workflows_table.table_name,
+                "REGION": Aws.REGION,
+                "AMC_SECRETS_MANAGER": self.amc_secrets_manager.secret_name,
             },
             layers=[
                 self.powertools_layer,
@@ -543,7 +646,9 @@ class WorkFlowManagerService(Construct):
                 "SOLUTION_VERSION": self.node.try_get_context("SOLUTION_VERSION"),
                 "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),
                 "WORKFLOWS_TABLE_NAME": self.dynamodb_workflows_table.table_name,
-                "RESOURCE_PREFIX": self._resource_prefix
+                "RESOURCE_PREFIX": self._resource_prefix,
+                "REGION": Aws.REGION,
+                "AMC_SECRETS_MANAGER": self.amc_secrets_manager.secret_name,
             },
             layers=[
                 self.powertools_layer,
@@ -618,6 +723,36 @@ class WorkFlowManagerService(Construct):
             ]
         )
 
+        self.lambda_amc_auth = _lambda.Function(
+            self,
+            'wfm-AMCAuth',
+            code=_lambda.Code.from_asset(
+                os.path.join(
+                    f"{Path(__file__).parents[1]}",
+                    "workflow_manager_service/lambdas/AMCAuth"
+                )
+            ),
+            description="Runs AMC OAuth Flow",
+            runtime=_lambda.Runtime.PYTHON_3_9,
+            architecture=_lambda.Architecture.ARM_64,
+            handler="handler.handler",
+            timeout=cdk.Duration.minutes(1),
+            environment={
+                "SOLUTION_ID": self.node.try_get_context("SOLUTION_ID"),
+                "SOLUTION_VERSION": self.node.try_get_context("SOLUTION_VERSION"),
+                "METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),
+                "RESOURCE_PREFIX": self._resource_prefix,
+                "AMC_SECRETS_MANAGER": self.amc_secrets_manager.secret_name,
+                "REGION": Aws.REGION
+            },
+            layers=[
+                self.powertools_layer,
+                self.wfm_layer,
+                self.metrics_layer,
+                SolutionsLayer.get_or_create(self)
+            ]
+        )
+
         # create cloudwatch events policy to allow the workflow scheduler lambdas to manage schedule rules
         self.cloudwatch_events_policy = Policy(
             self,
@@ -629,7 +764,8 @@ class WorkFlowManagerService(Construct):
                         "events:PutTargets",
                         "events:RemoveTargets",
                         "events:DeleteRule",
-                        "events:TagResource"
+                        "events:TagResource",
+                        "events:ListTargetsByRule"
                     ],
                     resources=[f"arn:aws:events:{cdk.Aws.REGION}:{cdk.Aws.ACCOUNT_ID}:rule/{self._resource_prefix}-*"]
                 )
@@ -654,39 +790,37 @@ class WorkFlowManagerService(Construct):
                 ),
             ]
         )
-        lambda_function_list = [self.lambda_cancel_workflow_execution, self.lambda_check_workflow_execution_status,
-                                self.lambda_create_workflow, self.lambda_create_workflow_execution,
-                                self.lambda_create_workflow_schedule, self.lambda_delete_workflow,
-                                self.lambda_delete_workflow_schedule, self.lambda_get_execution_summary,
-                                self.lambda_get_workflow, self.lambda_invoke_workflow_execution_sm,
-                                self.lambda_invoke_workflow_sm, self.lambda_update_workflow]
-        for function in lambda_function_list:
+
+        secrets_manager_actions = [
+            "secretsmanager:DescribeSecret",
+            "secretsmanager:CreateSecret",
+            "secretsmanager:UpdateSecret",
+            "secretsmanager:PutSecretValue",
+            "secretsmanager:GetSecretValue"
+        ]
+        secrets_manager_lambda_iam_policy = Policy(
+            self, "SecretsManagerLambdaIamPolicy",
+            statements=[
+                PolicyStatement(
+                    effect=Effect.ALLOW,
+                    actions=secrets_manager_actions,
+                    resources=[
+                        f"arn:aws:secretsmanager:{Aws.REGION}:{Aws.ACCOUNT_ID}:secret:{self.amc_secrets_manager.secret_name}*"],
+                )
+            ]
+        )
+
+        self.lambda_function_list = [self.lambda_cancel_workflow_execution, self.lambda_check_workflow_execution_status,
+                                     self.lambda_create_workflow, self.lambda_create_workflow_execution,
+                                     self.lambda_create_workflow_schedule, self.lambda_delete_workflow,
+                                     self.lambda_delete_workflow_schedule, self.lambda_get_execution_summary,
+                                     self.lambda_get_workflow, self.lambda_invoke_workflow_execution_sm,
+                                     self.lambda_invoke_workflow_sm, self.lambda_update_workflow,
+                                     self.lambda_amc_auth]
+        for function in self.lambda_function_list:
             cloudwatch_metrics_policy.attach_to_role(function.role)
-
-        # create default api invoke role for lambda functions
-        self.api_invoke_role = Role(
-            self,
-            "ApiInvokeRoleStandard",
-            description="Standard API role for WFM service when a customer is onboarded in the Connected AWS Account",
-            assumed_by=cdk.aws_iam.ServicePrincipal("lambda.amazonaws.com")
-        )
-
-        self.api_invoke_role.assume_role_policy.add_statements(
-            PolicyStatement(
-                effect=Effect.ALLOW,
-                actions=["sts:AssumeRole"],
-                principals=[
-                    cdk.aws_iam.ArnPrincipal(self.lambda_cancel_workflow_execution.role.role_arn),
-                    cdk.aws_iam.ArnPrincipal(self.lambda_check_workflow_execution_status.role.role_arn),
-                    cdk.aws_iam.ArnPrincipal(self.lambda_create_workflow.role.role_arn),
-                    cdk.aws_iam.ArnPrincipal(self.lambda_create_workflow_execution.role.role_arn),
-                    cdk.aws_iam.ArnPrincipal(self.lambda_delete_workflow.role.role_arn),
-                    cdk.aws_iam.ArnPrincipal(self.lambda_get_workflow.role.role_arn),
-                    cdk.aws_iam.ArnPrincipal(self.lambda_get_execution_summary.role.role_arn),
-                    cdk.aws_iam.ArnPrincipal(self.lambda_update_workflow.role.role_arn)
-                ]
-            )
-        )
+            secrets_manager_lambda_iam_policy.attach_to_role(function.role)
+            self.amc_secrets_manager.encryption_key.grant_encrypt_decrypt(function.role)
 
         ##################################
         #          Execution             #
@@ -810,10 +944,10 @@ class WorkFlowManagerService(Construct):
 
         result_selector_items = {
             "customerId.$": "$.Item.customerId.S",
-            "amcApiEndpoint.$": "$.Item.amcApiEndpoint.S",
-            "invokeAmcApiRoleArn.$": "$.Item.invokeAmcApiRoleArn.S",
             "outputSNSTopicArn.$": "$.Item.outputSNSTopicArn.S",
-            "amcRegion.$": "$.Item.amcRegion.S"
+            "amcInstanceId.$": "$.Item.amcInstanceId.S",
+            "amcAmazonAdsAdvertiserId.$": "$.Item.amcAmazonAdsAdvertiserId.S",
+            "amcAmazonAdsMarketplaceId.$": "$.Item.amcAmazonAdsMarketplaceId.S",
         }
 
         # State machine begins
@@ -935,11 +1069,11 @@ class WorkFlowManagerService(Construct):
 
         _executions_sm_log_group_name = f"/aws/vendedlogs/states/{Aws.STACK_NAME}-wfm-executions-{Fn.select(2, Fn.split('/', Aws.STACK_ID))}"
         _executions_sm_log_group = logs.LogGroup(
-            self, 
+            self,
             'WFMExecutionsSMLogGroup',
             log_group_name=_executions_sm_log_group_name,
             retention=logs.RetentionDays.INFINITE
-            )
+        )
 
         self.statemachine_workflow_executions_sm = stepfunctions.StateMachine(
             self,
@@ -998,10 +1132,10 @@ class WorkFlowManagerService(Construct):
 
         result_selector_items = {
             "customerId.$": "$.Item.customerId.S",
-            "amcApiEndpoint.$": "$.Item.amcApiEndpoint.S",
-            "invokeAmcApiRoleArn.$": "$.Item.invokeAmcApiRoleArn.S",
             "outputSNSTopicArn.$": "$.Item.outputSNSTopicArn.S",
-            "amcRegion.$": "$.Item.amcRegion.S"
+            "amcInstanceId.$": "$.Item.amcInstanceId.S",
+            "amcAmazonAdsAdvertiserId.$": "$.Item.amcAmazonAdsAdvertiserId.S",
+            "amcAmazonAdsMarketplaceId.$": "$.Item.amcAmazonAdsMarketplaceId.S",
         }
         task_get_customer_config = tasks.DynamoGetItem(
             self,
@@ -1083,7 +1217,7 @@ class WorkFlowManagerService(Construct):
         choice_evaluate_workflow_status_response.when(
             stepfunctions.Condition.or_(
                 stepfunctions.Condition.not_(
-                  stepfunctions.Condition.is_present("$.responseStatus")  
+                    stepfunctions.Condition.is_present("$.responseStatus")
                 ),
                 stepfunctions.Condition.not_(
                     stepfunctions.Condition.or_(
@@ -1142,11 +1276,11 @@ class WorkFlowManagerService(Construct):
 
         _workflows_sm_log_group_name = f"/aws/vendedlogs/states/{Aws.STACK_NAME}-wfm-workflows-{Fn.select(2, Fn.split('/', Aws.STACK_ID))}"
         _workflows_sm_log_group = logs.LogGroup(
-            self, 
+            self,
             'WFMWorkflowsSMLogGroup',
             log_group_name=_workflows_sm_log_group_name,
             retention=logs.RetentionDays.INFINITE
-            )
+        )
 
         self.statemachine_workflows_sm = stepfunctions.StateMachine(
             self,

@@ -31,6 +31,7 @@ def apply_handler_env():
     os.environ['APPLICATION_REGION'] = "us-east-1"
     os.environ['API_INVOKE_ROLE_STANDARD'] = "amcinsights-us-east-1-123456789-invokeAmcApiRole"
     os.environ['CLOUD_TRAIL_ARN'] = 'arn:aws:cloudtrail:us-east-1:111111111111:trail/test-trail'
+    os.environ['LOGGING_BUCKET_NAME'] = "testlogsbucket"
 
 
 @mock_aws
@@ -126,16 +127,16 @@ def test_handler(mock_get_physical_id, _mock_imports):
         "TenantName": customer,
         "customerName": customer,
         "amcOrangeAwsAccount": "978365123",
-        "amcRedAwsAccount": "978365123",
         "BucketName": "bucket_name",
         "amcDatasetName": "test",
         "amcTeamName": "test",
-        "amcRegion": os.environ['APPLICATION_REGION'],
-        "amcApiEndpoint": "https://test.example.com",
         "bucketExists": True,
         "bucketAccount":  os.environ['AWS_ACCOUNT_ID'],
         "bucketRegion": os.environ['APPLICATION_REGION'],
-        "snsTopicArn": "some_topic"
+        "snsTopicArn": "some_topic",
+        "amcInstanceId": "amc12345",
+        "amcAmazonAdsAdvertiserId": "12345",
+        "amcAmazonAdsMarketplaceId": "12345",
     }
 
     expected_tps = {
@@ -144,12 +145,13 @@ def test_handler(mock_get_physical_id, _mock_imports):
         'amcOrangeAwsAccount': '978365123',
         'BucketName': 'bucket_name',
         'amcDatasetName': 'test',
-        'amcApiEndpoint': 'https://test.example.com',
         'amcTeamName': 'test',
-        'amcRegion': os.environ['APPLICATION_REGION'],
         'bucketExists': True,
         'bucketAccount': os.environ['AWS_ACCOUNT_ID'],
-        'bucketRegion': os.environ['APPLICATION_REGION']
+        'bucketRegion': os.environ['APPLICATION_REGION'],
+        "amcInstanceId": "amc12345",
+        "amcAmazonAdsAdvertiserId": "12345",
+        "amcAmazonAdsMarketplaceId": "12345",
     }
 
     expected_sdlf = {
@@ -162,10 +164,10 @@ def test_handler(mock_get_physical_id, _mock_imports):
 
     expected_wfm = {
         'customerId': customer,
-        'amcApiEndpoint': 'https://test.example.com',
-        'amcRegion': os.environ['APPLICATION_REGION'],
-        'invokeAmcApiRoleArn': f'arn:aws:iam::978365123:role/prefix-us-east-1-{customer}-invokeAmcApiRole',
-        'outputSNSTopicArn': 'some_topic'
+        'outputSNSTopicArn': 'some_topic',
+        "amcInstanceId": "amc12345",
+        "amcAmazonAdsAdvertiserId": "12345",
+        "amcAmazonAdsMarketplaceId": "12345",
     }
 
     expected_selectors = test_selectors.copy()
@@ -199,7 +201,6 @@ def test_handler(mock_get_physical_id, _mock_imports):
     expected_tps["customerId"] = customer
 
     expected_wfm["customerId"] = customer
-    expected_wfm["invokeAmcApiRoleArn"] = f'arn:aws:iam::978365123:role/prefix-us-east-1-{customer}-invokeAmcApiRole'
     
 
     response_update = handler(test_event, None)
@@ -231,7 +232,6 @@ def test_handler(mock_get_physical_id, _mock_imports):
         expected_tps["customerId"] = customer
 
         expected_wfm["customerId"] = customer
-        expected_wfm["invokeAmcApiRoleArn"] = f'arn:aws:iam::978365123:role/prefix-us-east-1-{customer}-invokeAmcApiRole'
         
 
         response_update = handler(test_event, None)
@@ -241,7 +241,7 @@ def test_handler(mock_get_physical_id, _mock_imports):
 
         assert len(response_tps["Items"]) == 3
 
-        assert response_tps["Items"][2] == expected_tps
+        assert expected_tps in response_tps["Items"]
 
         response_sdlf = sdlf_table.scan(ConsistentRead=True)
         assert len(response_sdlf["Items"]) == 2
@@ -249,7 +249,7 @@ def test_handler(mock_get_physical_id, _mock_imports):
 
         response_wfm = wfm_table.scan(ConsistentRead=True)
         assert len(response_wfm["Items"]) == 3
-        assert response_wfm["Items"][2] == expected_wfm
+        assert expected_wfm in response_wfm["Items"]
 
     test_event = {
         "body": {

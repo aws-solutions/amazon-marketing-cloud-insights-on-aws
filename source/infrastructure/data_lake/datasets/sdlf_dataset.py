@@ -19,6 +19,7 @@ from aws_cdk.aws_ssm import StringParameter
 from aws_solutions.cdk.cfn_nag import add_cfn_nag_suppressions, CfnNagSuppression
 from data_lake.register.register_construct import RegisterConstruct
 from data_lake.foundations.foundations_construct import FoundationsConstruct
+from data_lake.stages.sdlf_heavy_transform.sdlf_heavy_transform import SDLFHeavyTransform
 from aws_cdk import Aws, Aspects
 from amc_insights.condition_aspect import ConditionAspect
 from data_lake.glue.glue_scripts_uploader import GlueScriptsUploader
@@ -35,6 +36,7 @@ class SDLFDatasetConstruct(Construct):
                  environment_id: str,
                  team: str,
                  foundations_resources: FoundationsConstruct,
+                 sdlf_pipeline_stage_b:SDLFHeavyTransform,
                  dataset_parameters,
                  solution_buckets,
                  creating_resources_condition,
@@ -47,26 +49,27 @@ class SDLFDatasetConstruct(Construct):
         self._environment_id: str = environment_id
         self._team = team
         self._pipeline = dataset_parameters.pipeline
-        self._dataset = dataset_parameters.dataset
+        self.dataset = dataset_parameters.dataset
         self._foundations_resources = foundations_resources
         self._stage_a_transform = dataset_parameters.stage_a_transform
         self._stage_b_transform = dataset_parameters.stage_b_transform
         self._solution_buckets = solution_buckets
+        self._sdlf_pipeline_stage_b = sdlf_pipeline_stage_b
 
         self._resource_prefix = Aws.STACK_NAME
 
         # glue script location in S3 bucket
         self._glue_prefix = "data_lake/sdlf_heavy_transform/glue"
-        self._glue_script_path = f"{self._glue_prefix}/{self._team}/{self._dataset}/main.py"
+        self._glue_script_path = f"{self._glue_prefix}/{self._team}/{self.dataset}/main.py"
 
         # glue script location
-        self._glue_script_local_file_path = f"sdlf_heavy_transform/{self._team}/{self._dataset}/main.py"
+        self._glue_script_local_file_path = f"sdlf_heavy_transform/{self._team}/{self.dataset}/main.py"
 
         GlueScriptsUploader(
             self,
             "SyncGlueScripts",
             self._solution_buckets,
-            self._dataset,
+            self.dataset,
             self._glue_prefix,
             self._glue_script_path,
             self._glue_script_local_file_path
@@ -87,7 +90,7 @@ class SDLFDatasetConstruct(Construct):
         self._props = {
             "id": "sdlf-dataset",
             "description": "sdlf dataset",
-            "name": f"{self._team}-{self._dataset}",
+            "name": f"{self._team}-{self.dataset}",
             "type": "octagon_dataset",
             "pipeline": self._pipeline,
             "max_items_process": {
@@ -119,8 +122,8 @@ class SDLFDatasetConstruct(Construct):
                     ],
                     resources=[
                         f"arn:aws:glue:{Aws.REGION}:{Aws.ACCOUNT_ID}:catalog",
-                        f"arn:aws:glue:{Aws.REGION}:{Aws.ACCOUNT_ID}:database/{self._resource_prefix}_datalake_{self._environment_id}_{self._team}_{self._dataset}_db",
-                        f"arn:aws:glue:{Aws.REGION}:{Aws.ACCOUNT_ID}:table/{self._resource_prefix}_datalake_{self._environment_id}_{self._team}_{self._dataset}_db/*",
+                        f"arn:aws:glue:{Aws.REGION}:{Aws.ACCOUNT_ID}:database/{self._resource_prefix}_datalake_{self._environment_id}_{self._team}_{self.dataset}_db",
+                        f"arn:aws:glue:{Aws.REGION}:{Aws.ACCOUNT_ID}:table/{self._resource_prefix}_datalake_{self._environment_id}_{self._team}_{self.dataset}_db/*",
                         f"arn:aws:glue:{Aws.REGION}:{Aws.ACCOUNT_ID}:database/default",
                         f"arn:aws:glue:{Aws.REGION}:{Aws.ACCOUNT_ID}:database/global_temp",
                     ],
@@ -230,8 +233,8 @@ class SDLFDatasetConstruct(Construct):
         self.job: CfnJob = CfnJob(
             self,
             "sdlf-heavy-transform-glue-job",
-            name=f"{self._resource_prefix}-{self._team}-{self._dataset}-glue-job",
-            glue_version="2.0",
+            name=f"{self._resource_prefix}-{self._team}-{self.dataset}-glue-job",
+            glue_version="4.0",
             allocated_capacity=2,
             execution_property=CfnJob.ExecutionPropertyProperty(max_concurrent_runs=4),
             command=CfnJob.JobCommandProperty(
@@ -241,7 +244,7 @@ class SDLFDatasetConstruct(Construct):
             default_arguments={
                 "--job-bookmark-option": "job-bookmark-enable",
                 "--enable-metrics": "",
-                "--additional-python-modules": "awswrangler==2.4.0,aws-lambda-powertools==2.15.0",
+                "--additional-python-modules": "awswrangler>=2.4.0,aws-lambda-powertools>=2.15.0",
                 "--enable-job-insights": "true",
                 "--SOLUTION_ID": self.node.try_get_context("SOLUTION_ID"),
                 "--SOLUTION_VERSION": self.node.try_get_context("SOLUTION_VERSION"),
@@ -253,8 +256,8 @@ class SDLFDatasetConstruct(Construct):
 
         StringParameter(
             self,
-            f"amc-heavy-transform-{self._team}-{self._dataset}-job-name",
-            parameter_name=f"/{self._resource_prefix}/Glue/{self._team}/{self._dataset}/SDLFHeavyTransformJobName",
+            f"amc-heavy-transform-{self._team}-{self.dataset}-job-name",
+            parameter_name=f"/{self._resource_prefix}/Glue/{self._team}/{self.dataset}/SDLFHeavyTransformJobName",
             simple_name=True,
             string_value=self.job.name,  # type: ignore
         )
@@ -269,7 +272,7 @@ class SDLFDatasetConstruct(Construct):
                 )])
         datalake_settings.node.add_dependency(self.glue_role)
 
-        database_name = f"{self._resource_prefix}_datalake_{self._environment_id}_{self._team}_{self._dataset}_db"
+        database_name = f"{self._resource_prefix}_datalake_{self._environment_id}_{self._team}_{self.dataset}_db"
         database: CfnDatabase = CfnDatabase(
             self,
             "database",
@@ -293,8 +296,8 @@ class SDLFDatasetConstruct(Construct):
 
         StringParameter(
             self,
-            f"amc-{self._team}-{self._dataset}-stage-catalog",
-            parameter_name=f"/{self._resource_prefix}/Glue/{self._team}/{self._dataset}/StageDataCatalog",
+            f"amc-{self._team}-{self.dataset}-stage-catalog",
+            parameter_name=f"/{self._resource_prefix}/Glue/{self._team}/{self.dataset}/StageDataCatalog",
             simple_name=True,
             string_value=database_name
         )
@@ -306,7 +309,7 @@ class SDLFDatasetConstruct(Construct):
             self,
             id="sqs-key-b",
             description="SQS Key Stage B",
-            alias=f"alias/{self._resource_prefix}-{self._team}-{self._dataset}-sqs-stage-b-key",
+            alias=f"alias/{self._resource_prefix}-{self._team}-{self.dataset}-sqs-stage-b-key",
             enable_key_rotation=True,
             pending_window=Duration.days(30),
             removal_policy=RemovalPolicy.DESTROY,
@@ -316,7 +319,7 @@ class SDLFDatasetConstruct(Construct):
             max_receive_count=1,
             queue=sqs.Queue(self,
                             id='amc-dlq-b',
-                            queue_name=f'{self._resource_prefix}-{self._team}-{self._dataset}-dlq-b.fifo',
+                            queue_name=f'{self._resource_prefix}-{self._team}-{self.dataset}-dlq-b.fifo',
                             fifo=True,
                             visibility_timeout=Duration.seconds(60),
                             encryption=QueueEncryption.KMS,
@@ -336,15 +339,15 @@ class SDLFDatasetConstruct(Construct):
         StringParameter(
             self,
             'amc-dlq-b.fifo-ssm',
-            parameter_name=f"/{self._resource_prefix}/SQS/{self._team}/{self._dataset}StageBDLQ",
+            parameter_name=f"/{self._resource_prefix}/SQS/{self._team}/{self.dataset}StageBDLQ",
             simple_name=True,
-            string_value=f'{self._resource_prefix}-{self._team}-{self._dataset}-dlq-b.fifo',
+            string_value=f'{self._resource_prefix}-{self._team}-{self.dataset}-dlq-b.fifo',
         )
 
         sqs.Queue(
             self,
             id='amc-queue-b',
-            queue_name=f'{self._resource_prefix}-{self._team}-{self._dataset}-queue-b.fifo',
+            queue_name=f'{self._resource_prefix}-{self._team}-{self.dataset}-queue-b.fifo',
             fifo=True,
             visibility_timeout=Duration.seconds(60),
             encryption=QueueEncryption.KMS,
@@ -354,35 +357,37 @@ class SDLFDatasetConstruct(Construct):
         StringParameter(
             self,
             'amc-queue-b.fifo-ssm',
-            parameter_name=f"/{self._resource_prefix}/SQS/{self._team}/{self._dataset}StageBQueue",
+            parameter_name=f"/{self._resource_prefix}/SQS/{self._team}/{self.dataset}StageBQueue",
             simple_name=True,
-            string_value=f'{self._resource_prefix}-{self._team}-{self._dataset}-queue-b.fifo',
+            string_value=f'{self._resource_prefix}-{self._team}-{self.dataset}-queue-b.fifo',
         )
 
         # Eventbridge and event source mapping
         post_state_rule = CfnRule(
             self,
             "rule-b",
-            name=f"{self._resource_prefix}-{self._team}-{self._dataset}-rule-b",
+            name=f"{self._resource_prefix}-{self._team}-{self.dataset}-rule-b",
+            description=f"Check stage b routing for {self.dataset} dataset every 5 minutes",
             schedule_expression="cron(*/5 * * * ? *)",
             state="ENABLED",
             targets=[CfnRule.TargetProperty(
-                arn=f"arn:aws:lambda:{Aws.REGION}:{Aws.ACCOUNT_ID}:function:{self._resource_prefix}-{self._team}-{self._pipeline}-routing-b",
+                arn=self._sdlf_pipeline_stage_b._routing_lambda.function_arn,
                 id="target-rule-b",
                 input=json.dumps({
                     "team": self._team,
                     "pipeline": self._pipeline,
                     "pipeline_stage": "StageB",
-                    "dataset": self._dataset,
+                    "dataset": self.dataset,
                     "env": self._environment_id
                 }, indent=4)
             )])
 
-        CfnPermission(
+        event_invoke_lambda_permission = CfnPermission(
             self,
             "sdlf-dataset-routing-b",
             action="lambda:InvokeFunction",
-            function_name=f"{self._resource_prefix}-{self._team}-{self._pipeline}-routing-b",
+            function_name=self._sdlf_pipeline_stage_b._routing_lambda.function_name,
             principal="events.amazonaws.com",
             source_arn=post_state_rule.attr_arn
         )
+        event_invoke_lambda_permission.node.add_dependency(self._sdlf_pipeline_stage_b._routing_lambda)

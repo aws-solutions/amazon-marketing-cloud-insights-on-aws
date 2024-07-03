@@ -1,12 +1,10 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from aws_solutions.core.helpers import get_service_client, get_service_resource
+from aws_solutions.core.helpers import get_service_resource
 import json
 from boto3.dynamodb.types import TypeDeserializer
-from botocore.exceptions import ClientError
 from decimal import Decimal
-import logging
 import datetime as dt
 import calendar
 from dateutil.relativedelta import relativedelta
@@ -23,58 +21,17 @@ class Utils:
 
         Parameters
         ----------
-        logger
+        logger:
             logger object for the class to use log info and error events
         """
         self.logger = logger
 
-    def deserialize_dynamodb_item(self, item: dict) -> dict:
+    @staticmethod
+    def deserialize_dynamodb_item(item: dict) -> dict:
         return {k: TypeDeserializer().deserialize(value=v) for k, v in item.items()}
 
-    # This function will retrieve customer config records, you can specify the customer ID if you want a particular customer record
-    def dynamodb_get_customer_config_records(self, dynamodb_table_name: str, customer_id: str = None) -> dict:
-        customer_configs = {}
-        # Set up a DynamoDB Connection
-        dynamodb = get_service_client('dynamodb')
-
-        if customer_id is None:
-            # We want to get the whole table for all configs so we paginate in case there is large number of items
-            paginator = dynamodb.get_paginator('scan')
-            response_iterator = paginator.paginate(
-                TableName=dynamodb_table_name, PaginationConfig={'PageSize': 100}
-            )
-        else:
-            # paginate in case there is large number of items
-            paginator = dynamodb.get_paginator('query')
-            response_iterator = paginator.paginate(
-                TableName=dynamodb_table_name,
-                Select='ALL_ATTRIBUTES',
-                Limit=1,
-                ConsistentRead=False,
-                ReturnConsumedCapacity='TOTAL',
-                KeyConditions={
-                    'customerId': {
-                        'AttributeValueList': [
-                            {
-                                'S': customer_id
-                            },
-                        ],
-                        'ComparisonOperator': 'EQ'
-                    }
-                }, PaginationConfig={'PageSize': 100})
-
-        # Iterate over each page from the iterator
-        for page in response_iterator:
-            # deserialize each "item" (or record) into a client config dictionary
-            if 'Items' in page:
-                for item in page['Items']:
-                    customer_config_item = self.deserialize_dynamodb_item(item)
-                    # add the client config dictionary to our array
-                    customer_configs[customer_config_item['customerId']] = customer_config_item.copy()
-        return customer_configs
-
+    @staticmethod
     def get_current_date_with_offset(
-            self,
             offset_in_days: int,
             date_format: str = '%Y-%m-%dT00:00:00'  # NOSONAR
     ) -> str:
@@ -93,11 +50,10 @@ class Utils:
             Formatted date string
 
         """
-        return ((dt.datetime.today() + dt.timedelta(days=offset_in_days)).strftime(date_format))
+        return (dt.datetime.today() + dt.timedelta(days=offset_in_days)).strftime(date_format)
 
-
+    @staticmethod
     def get_current_date_with_month_offset(
-            self,
             offset_in_months: int
     ) -> dt.datetime:
         """
@@ -116,8 +72,8 @@ class Utils:
         """
         return dt.datetime.today() + relativedelta(months=offset_in_months)
 
+    @staticmethod
     def get_last_day_of_month(
-            self,
             date: dt.datetime
     ) -> int:
         """
@@ -125,7 +81,7 @@ class Utils:
 
         Parameters
         ----------
-        date
+        date:
             Date to find the last day of the month for
 
         Returns
@@ -157,69 +113,59 @@ class Utils:
 
         """
         if isinstance(parameter_value, str):
-            if parameter_value.upper() == 'NOW()':
+            parameter_value_in_uppercase = parameter_value.upper()
+
+            if parameter_value_in_uppercase == 'NOW()':
                 return dt.datetime.today().strftime('%Y-%m-%dT%H:%M:%S')
 
-            if "TODAY(" in parameter_value.upper():
+            if "TODAY(" in parameter_value_in_uppercase:
                 if parameter_value.upper() == "TODAY()":
                     return self.get_current_date_with_offset(0)
                 else:
                     return self.get_current_date_with_offset(self.get_offset_value(parameter_value))
 
-            if "LASTDAYOFOFFSETMONTH(" in parameter_value.upper():
+            if "LASTDAYOFOFFSETMONTH(" in parameter_value_in_uppercase:
                 date_with_month_offset = self.get_current_date_with_month_offset(
                     self.get_offset_value(parameter_value))
                 last_day_of_previous_month = self.get_last_day_of_month(
                     date_with_month_offset)
-                return_value = dt.datetime(date_with_month_offset.year, date_with_month_offset.month,
-                                        last_day_of_previous_month,
-                                        date_with_month_offset.hour, date_with_month_offset.minute).strftime(
+                return dt.datetime(date_with_month_offset.year, date_with_month_offset.month,
+                                   last_day_of_previous_month,
+                                   date_with_month_offset.hour, date_with_month_offset.minute).strftime(
                     '%Y-%m-%dT00:00:00')
-                return return_value
 
-            if "FIRSTDAYOFOFFSETMONTH(" in parameter_value.upper():
+            if "FIRSTDAYOFOFFSETMONTH(" in parameter_value_in_uppercase:
                 date_with_month_offset = self.get_current_date_with_month_offset(
                     self.get_offset_value(parameter_value))
-                return_value = dt.datetime(date_with_month_offset.year, date_with_month_offset.month, 1,
-                                        date_with_month_offset.hour,
-                                        date_with_month_offset.minute).strftime('%Y-%m-%dT00:00:00')
-                return return_value
+                return dt.datetime(date_with_month_offset.year, date_with_month_offset.month, 1,
+                                   date_with_month_offset.hour,
+                                   date_with_month_offset.minute).strftime('%Y-%m-%dT00:00:00')
 
-            if "FIFTEENTHDAYOFOFFSETMONTH(" in parameter_value.upper():
+            if "FIFTEENTHDAYOFOFFSETMONTH(" in parameter_value_in_uppercase:
                 date_with_month_offset = self.get_current_date_with_month_offset(
                     self.get_offset_value(parameter_value))
-                return_value = dt.datetime(date_with_month_offset.year, date_with_month_offset.month, 15,
-                                        date_with_month_offset.hour,
-                                        date_with_month_offset.minute).strftime('%Y-%m-%dT00:00:00')
-                return return_value
+                return dt.datetime(date_with_month_offset.year, date_with_month_offset.month, 15,
+                                   date_with_month_offset.hour,
+                                   date_with_month_offset.minute).strftime('%Y-%m-%dT00:00:00')
+
         # if no conditions are met, return the parameter unchanged
         return parameter_value
 
-
-    def dynamodb_put_item(self, table_name: str, item: dict) -> bool:
-        logger = self.logger
-        logger.info(f'Creating item: {item} in table: {table_name}')
+    def dynamodb_put_item(self, table_name: str, item: dict):
+        self.logger.info(f'Creating item: {item} in table: {table_name}')
         dynamodb = get_service_resource('dynamodb')
         table = dynamodb.Table(table_name)
 
-        response = ''
         try:
             response = table.put_item(Item=item)
             self.logger.info(f'Response: {response["ResponseMetadata"]["HTTPStatusCode"]}')
-            return True
-
         except Exception as e:
-            if e.response['Error']['Code'] == "ConditionalCheckFailedException":
-                logger.error(e.response['Error']['Message'])
-            else:
-                self.logger.error("Failed to write record")
-                self.logger.error(e.response['Error']['Code'])
-                self.logger.error(e.response['Error']['Message'])
-                return False
+            self.logger.error(f"Failed to write record {item} to Dynamodb table {table_name}")
+            self.logger.error(e)
 
-    # This function will decode anything that is not a string to a string, this is helpful when returning a json object
-    def json_encoder_default(self, obj):
-
+    @staticmethod
+    def json_encoder_default(obj):
+        # This function will decode anything that is not a string to a string, this is helpful when returning a json object
         if isinstance(obj, Decimal):
             return str(obj)
 
@@ -229,7 +175,8 @@ class Utils:
         if not isinstance(obj, str):
             return str(obj)
 
-    def get_offset_value(self, offset_value: str) -> int:
+    @staticmethod
+    def get_offset_value(offset_value: str) -> int:
         """
         Gets the value between parentheses as an integer
 

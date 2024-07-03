@@ -68,40 +68,6 @@ def test_on_create_or_update(lambda_event, __mock_imports, _mock_clients, _mock_
     on_create_or_update(lambda_event, None)
     _helpers_service_clients['s3'].upload_file.assert_called_once()
 
-
-@pytest.mark.parametrize(
-    "lambda_event",
-    [
-        {
-            "ResourceProperties":
-                {
-                    "artifacts_bucket_name": "artifacts_bucket",
-                    "artifacts_key_prefix": "tps/scripts/adtech",
-                },
-            "RequestType": "Delete",
-            "PhysicalResourceId": "id",
-        }
-    ],
-)
-def test_on_delete(lambda_event, __mock_imports, _mock_clients, _mock_functions):
-    from amc_insights.custom_resource.tenant_provisioning_service.lambdas.sync_amc_initialize_template import on_delete
-    on_delete(lambda_event, None)
-    _helpers_service_clients['s3'].delete_object.assert_called_once()
-
-
-def test_on_create_or_update_exception(__mock_imports):
-    from amc_insights.custom_resource.tenant_provisioning_service.lambdas.sync_amc_initialize_template import \
-        on_create_or_update
-    with pytest.raises(Exception):
-        on_create_or_update({"ResourceProperties": "12345"}, None)
-
-
-def test_on_delete_exception(__mock_imports):
-    from amc_insights.custom_resource.tenant_provisioning_service.lambdas.sync_amc_initialize_template import on_delete
-    with pytest.raises(Exception):
-        on_delete({"ResourceProperties": "12345"}, None)
-
-
 @patch("amc_insights.custom_resource.tenant_provisioning_service.lambdas.sync_amc_initialize_template.helper")
 def test_event_handler(mock_helper, __mock_imports):
     from amc_insights.custom_resource.tenant_provisioning_service.lambdas.sync_amc_initialize_template import event_handler

@@ -6,7 +6,6 @@ from aws_solutions.core.helpers import get_service_client
 import os
 from aws_lambda_powertools import Logger
 from decimal import Decimal
-import re
 from cloudwatch_metrics import metrics
 
 STATE_MACHINE_ARN = os.environ['STATE_MACHINE_ARN']
@@ -31,17 +30,8 @@ def json_encoder_default(obj):
     if not isinstance(obj, str):
         return str(obj)
 
-def get_amc_region(endpoint_url):
-    match = re.search(r'(?<=\.execute-api\.)[a-z0-9-]+(?=\.amazonaws\.com)', endpoint_url)
-    if match:
-        return match.group(0)
-    else:
-        logger.info("The AMC API endpoint provided was invalid. Check value passed.")
-
 def format_payload(customer_details):
-    amc_api_endpoint = customer_details["amc"]["endpoint_url"]
     customer_id = customer_details['customer_id']
-    amc_region = get_amc_region(amc_api_endpoint)
     sns_topic = DEFAULT_SNS_TOPIC
 
     payload = {
@@ -55,10 +45,10 @@ def format_payload(customer_details):
         "amcOrangeAwsAccount":customer_details["amc"]["aws_orange_account_id"],
         "BucketName":customer_details["amc"]["bucket_name"],
         "amcDatasetName":DATASET_NAME,
-        "amcApiEndpoint": amc_api_endpoint,
         "amcTeamName":TEAM_NAME,
-        "amcRegion": amc_region,
-        "amcRedAwsAccount":customer_details["amc"]["aws_red_account_id"],
+        "amcInstanceId": customer_details["amc"]["instance_id"],
+        "amcAmazonAdsAdvertiserId":customer_details["amc"]["amazon_ads_advertiser_id"],
+        "amcAmazonAdsMarketplaceId": customer_details["amc"]["amazon_ads_marketplace_id"],
 
         # Customer info for S3 bucket deployment
         "bucketExists":customer_details.get('bucket_exists', "true"),

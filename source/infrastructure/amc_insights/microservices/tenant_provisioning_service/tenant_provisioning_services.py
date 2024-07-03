@@ -34,7 +34,6 @@ class TenantProvisioningService(Construct):
             workflow_manager_resources,
             creating_resources_condition: CfnCondition,
             solution_buckets,
-            cloudtrail_resources,
             data_lake_enabled
     ) -> None:
         super().__init__(scope, id)
@@ -49,9 +48,9 @@ class TenantProvisioningService(Construct):
         self._resource_prefix = Aws.STACK_NAME
         self._workflow_manager_resources = workflow_manager_resources
         self._solution_buckets = solution_buckets
-        self._cloudtrail_resources = cloudtrail_resources
         self._data_lake_enabled = data_lake_enabled.value_as_string
         self._creating_resources_condition = creating_resources_condition
+        self.lambda_function_list = []
 
         AMCTemplateUploader(
             self, "SyncAMCTemplate",
@@ -66,8 +65,12 @@ class TenantProvisioningService(Construct):
         self._customer_config_ddb = self._create_ddb_table(ddb_name="tps-CustomerConfig")
 
         self._create_lamda_layer()
-        self._create_amc_onboarding_sm()
-        self._create_lambdas()
+
+        self.create_amc_onboarding_sm()
+
+        self.create_invoke_tps_initialize_sm_lambda()
+
+        self.add_cloudwatch_metric_policy_to_lambdas(self.lambda_function_list)
 
         self._suppress_cfn_nag_warnings()
 
@@ -140,8 +143,8 @@ class TenantProvisioningService(Construct):
     #           Lambdas                  #
     ######################################
 
-    def _create_lambdas(self):
-        self._lambda_invoke_tps_initialize_sm = Function(
+    def create_invoke_tps_initialize_sm_lambda(self):
+        self.lambda_invoke_tps_initialize_sm = Function(
             self,
             "InvokeTPSInitializeSM",
             function_name=f"{self._resource_prefix}-tps-InvokeTPSInitializeSM",
@@ -169,7 +172,9 @@ class TenantProvisioningService(Construct):
             layers=[self.powertools_layer, SolutionsLayer.get_or_create(self), self.metrics_layer]
         )
 
-        self._lambda_invoke_tps_initialize_sm.add_to_role_policy(
+        self.lambda_function_list.append(self.lambda_invoke_tps_initialize_sm)
+
+        self.lambda_invoke_tps_initialize_sm.add_to_role_policy(
             PolicyStatement(
                 effect=Effect.ALLOW,
                 actions=["states:StartExecution"],
@@ -178,7 +183,7 @@ class TenantProvisioningService(Construct):
                 ],
             )
         )
-        self._lambda_invoke_tps_initialize_sm.add_to_role_policy(
+        self.lambda_invoke_tps_initialize_sm.add_to_role_policy(
             PolicyStatement(
                 effect=Effect.ALLOW,
                 actions=[
@@ -193,21 +198,8 @@ class TenantProvisioningService(Construct):
                 ],
             )
         )
-        # Grant permission to record metrics in cloudwatch.
-        # This is needed for anonymized metrics.
-        self._lambda_invoke_tps_initialize_sm.add_to_role_policy(
-            PolicyStatement(
-                effect=Effect.ALLOW,
-                actions=["cloudwatch:PutMetricData"],
-                resources=[
-                    "*"
-                ],
-                conditions={"StringEquals": {
-                    "cloudwatch:namespace": self.node.try_get_context("METRICS_NAMESPACE")}}
-            )
-        )
 
-    def _create_amc_onboarding_sm(self):
+    def create_amc_onboarding_sm(self):
         add_amc_instance_role = Role(
             self,
             "Add AMC Instance Role",
@@ -242,7 +234,7 @@ class TenantProvisioningService(Construct):
                         "s3:PutBucketOwnershipControls",
                         "s3:GetObject",  # NOSONAR
                         "s3:PutObject",  # NOSONAR
-                        "s3:PutBucketVersioning"
+                        "s3:PutBucketVersioning",
                     ],
                     resources=[
                         "arn:aws:s3:::amc*",
@@ -435,7 +427,7 @@ class TenantProvisioningService(Construct):
             [CfnNagSuppression(rule_id="W11", reason="IAM role should not allow * resource on its permissions policy")]
         )
 
-        self._add_amc_instance = Function(
+        self.add_amc_instance = Function(
             self,
             "AddAmcInstance",
             function_name=f"{self._resource_prefix}-tps-AddAmcInstance",
@@ -456,30 +448,19 @@ class TenantProvisioningService(Construct):
                 "ADD_AMC_INSTANCE_LAMBDA_ROLE_ARN": add_amc_instance_role.role_arn,
                 "RESOURCE_PREFIX": Aws.STACK_NAME,
                 "DATA_LAKE_ENABLED": str(self._data_lake_enabled),
-                "WFM_LAMBDA_ROLE_NAMES": f'''
-                    {self._workflow_manager_resources.lambda_check_workflow_execution_status.role.role_name},
-                    {self._workflow_manager_resources.lambda_create_workflow_execution.role.role_name},
-                    {self._workflow_manager_resources.lambda_cancel_workflow_execution.role.role_name},
-                    {self._workflow_manager_resources.lambda_create_workflow.role.role_name},
-                    {self._workflow_manager_resources.lambda_update_workflow.role.role_name},
-                    {self._workflow_manager_resources.lambda_get_workflow.role.role_name},
-                    {self._workflow_manager_resources.lambda_delete_workflow.role.role_name},
-                    {self._workflow_manager_resources.lambda_get_execution_summary.role.role_name}
-                    ''',
                 "SNS_KMS_KEY_ID": self._workflow_manager_resources.kms_key.key_id,
                 "APPLICATION_ACCOUNT": Aws.ACCOUNT_ID,
                 "APPLICATION_REGION": Aws.REGION,
                 "LOGGING_BUCKET_NAME": self._solution_buckets.logging_bucket.bucket_name,
                 "ARTIFACTS_BUCKET_NAME": self._solution_buckets.artifacts_bucket.bucket_name,
                 "ARTIFACTS_BUCKET_KEY_ID": self._solution_buckets.artifacts_bucket_key.key_id,
-                "API_INVOKE_ROLE_STANDARD": self._workflow_manager_resources.api_invoke_role.role_name,
                 "ROUTING_QUEUE_LOGICAL_ID": 'datalakepipelinedatalakeroutingBEE8F1BC',
                 "STAGE_A_ROLE_LOGICAL_ID": 'datalakepipelinesdlfstageaprocessaServiceRole15419483',
             },
             layers=[self.powertools_layer, SolutionsLayer.get_or_create(self), self.metrics_layer]
         )
 
-        self._add_amc_instance_check = Function(
+        self.add_amc_instance_check = Function(
             self,
             "AddAmcInstanceStatusCheck",
             function_name=f"{self._resource_prefix}-tps-AddAmcInstanceStatusCheck",
@@ -501,7 +482,7 @@ class TenantProvisioningService(Construct):
             layers=[self.powertools_layer, SolutionsLayer.get_or_create(self), self.metrics_layer]
         )
 
-        self._amc_instance_post_deploy_metadata = Function(
+        self.amc_instance_post_deploy_metadata = Function(
             self,
             "postDeployMetadataInstanceConfig",
             function_name=f"{self._resource_prefix}-tps-postDeployMetadataInstanceConfig",
@@ -524,87 +505,68 @@ class TenantProvisioningService(Construct):
                 "AWS_ACCOUNT_ID": Aws.ACCOUNT_ID,
                 "TPS_CUSTOMER_CONFIG_TABLE": self._customer_config_ddb.table_name,
                 "APPLICATION_REGION": Aws.REGION,
-                "API_INVOKE_ROLE_STANDARD": self._workflow_manager_resources.api_invoke_role.role_name,
                 "SDLF_CUSTOMER_CONFIG_LOGICAL_ID": "foundationssdlfCustomerConfig45371CE6",
-                "CLOUD_TRAIL_ARN": self._cloudtrail_resources.trail.trail_arn
+                "LOGGING_BUCKET_NAME": self._solution_buckets.logging_bucket.bucket_name,
             },
             layers=[self.powertools_layer, SolutionsLayer.get_or_create(self), self.metrics_layer]
         )
-        self._customer_config_ddb.grant_read_write_data(self._amc_instance_post_deploy_metadata)
+
+        self.lambda_function_list.extend(
+            [self.add_amc_instance, self.add_amc_instance_check, self.amc_instance_post_deploy_metadata])
+
+        self._customer_config_ddb.grant_read_write_data(self.amc_instance_post_deploy_metadata)
         self._workflow_manager_resources.dynamodb_customer_config_table.grant_read_write_data(
-            self._amc_instance_post_deploy_metadata)
-
-        kms_policy_statement = PolicyStatement(
-            effect=Effect.ALLOW,
-            actions=[
-                "kms:DescribeKey",
-                "kms:Encrypt",
-                "kms:Decrypt",
-                "kms:ReEncrypt*",
-                "kms:GenerateDataKey*",
-                "kms:CreateGrant*"
-            ],
-            resources=[
-                self.tps_kms_key.key_arn,
-                self._workflow_manager_resources.kms_key.key_arn,
-            ],
-        )
-
-        cloudformation_policy_statement = PolicyStatement(
-            effect=Effect.ALLOW,
-            actions=[
-                "cloudformation:DescribeStackResource"
-            ],
-            resources=[
-                f"arn:aws:cloudformation:*:{cdk.Aws.ACCOUNT_ID}:stack/{self._resource_prefix}*",
-            ]
-        )
-
-        cloudtrail_policy_statement = PolicyStatement(
-            effect=Effect.ALLOW,
-            actions=[
-                "cloudtrail:GetEventSelectors",
-                "cloudtrail:PutEventSelectors",
-                "cloudtrail:GetTrail",
-                "cloudtrail:ListTrails",
-                "cloudtrail:UpdateTrail",
-            ],
-            resources=[
-                self._cloudtrail_resources.trail.trail_arn
-            ]
-        )
+            self.amc_instance_post_deploy_metadata)
 
         amc_instance_post_deploy_metadata_policy = Policy(
             self, "postDeployMetadataInstanceConfigPolicy",
-            statements=[kms_policy_statement, cloudformation_policy_statement, cloudtrail_policy_statement]
-        )
-
-        cloudwatch_metrics_policy = Policy(
-            self,
-            "PutCloudWatchMetricsPolicy",
             statements=[
                 PolicyStatement(
                     effect=Effect.ALLOW,
-                    actions=["cloudwatch:PutMetricData"],
-                    resources=["*"],
+                    actions=[
+                        "kms:DescribeKey",
+                        "kms:Encrypt",
+                        "kms:Decrypt",
+                        "kms:ReEncrypt*",
+                        "kms:GenerateDataKey*",
+                        "kms:CreateGrant*"
+                    ],
+                    resources=[
+                        self.tps_kms_key.key_arn,
+                        self._workflow_manager_resources.kms_key.key_arn,
+                    ],
+                ),
+                PolicyStatement(
+                    effect=Effect.ALLOW,
+                    actions=[
+                        "cloudformation:DescribeStackResource",
+                        "cloudformation:DescribeStacks"
+                    ],
+                    resources=[
+                        f"arn:aws:cloudformation:*:{cdk.Aws.ACCOUNT_ID}:stack/{self._resource_prefix}*",
+                    ]
+                ),
+                PolicyStatement(
+                    effect=Effect.ALLOW,
+                    actions=[
+                        "s3:GetBucketLogging",
+                        "s3:PutBucketLogging",
+                        "s3:PutBucketPolicy"
+                    ],
+                    resources=[
+                        "arn:aws:s3:::amc*",
+                    ],
                     conditions={
                         "StringEquals": {
-                            "cloudwatch:namespace": self.node.try_get_context("METRICS_NAMESPACE")
+                            AWS_RESOURCE_ACCOUNT_KEY: [
+                                f"{Aws.ACCOUNT_ID}"
+                            ]
                         }
                     }
                 )
             ]
         )
-
-        add_cfn_nag_suppressions(
-            cloudwatch_metrics_policy.node.default_child,
-            LOGGING_SUPRESSION
-        )
-
-        amc_instance_post_deploy_metadata_policy.attach_to_role(self._amc_instance_post_deploy_metadata.role)
-        cloudwatch_metrics_policy.attach_to_role(self._add_amc_instance.role)
-        cloudwatch_metrics_policy.attach_to_role(self._add_amc_instance_check.role)
-        cloudwatch_metrics_policy.attach_to_role(self._amc_instance_post_deploy_metadata.role)
+        amc_instance_post_deploy_metadata_policy.attach_to_role(self.amc_instance_post_deploy_metadata.role)
 
         add_cfn_nag_suppressions(
             amc_instance_post_deploy_metadata_policy.node.default_child,
@@ -623,7 +585,7 @@ class TenantProvisioningService(Construct):
                             "States": {
                                 "Process AMC Instance Request": {
                                     "Type": "Task",
-                                    "Resource": self._add_amc_instance.function_arn,
+                                    "Resource": self.add_amc_instance.function_arn,
                                     "Comment": "Process AMC Instance Request",
                                     "ResultPath": "$.body.stackId",
                                     "Next": "Wait"
@@ -635,7 +597,7 @@ class TenantProvisioningService(Construct):
                                 },
                                 "Get Stack status": {
                                     "Type": "Task",
-                                    "Resource": self._add_amc_instance_check.function_arn,
+                                    "Resource": self.add_amc_instance_check.function_arn,
                                     "ResultPath": "$.body.stackStatus",  # NOSONAR
                                     "Next": "Did Job finish?"
                                 },
@@ -663,7 +625,7 @@ class TenantProvisioningService(Construct):
                                 },
                                 "Post-deploy update config tables": {
                                     "Type": "Task",
-                                    "Resource": self._amc_instance_post_deploy_metadata.function_arn,
+                                    "Resource": self.amc_instance_post_deploy_metadata.function_arn,
                                     "Comment": "Post-deploy update config tables",
                                     "ResultPath": "$.statusCode",
                                     "End": True
@@ -691,11 +653,11 @@ class TenantProvisioningService(Construct):
 
         _log_group_name = f"/aws/vendedlogs/states/{Aws.STACK_NAME}-tps-initialize-amc-{Fn.select(2, Fn.split('/', Aws.STACK_ID))}"
         _sfn_log_group = logs.LogGroup(
-            self, 
-            'tps-initialize-amc-log-group', 
+            self,
+            'tps-initialize-amc-log-group',
             log_group_name=_log_group_name,
             retention=logs.RetentionDays.INFINITE
-            )
+        )
 
         name = "tps-initialize-amc"
         sfn_role: Role = Role(
@@ -780,6 +742,32 @@ class TenantProvisioningService(Construct):
                 level="ALL",
             )
         )
+
+    def add_cloudwatch_metric_policy_to_lambdas(self, lambda_function_list):
+        cloudwatch_metrics_policy = Policy(
+            self,
+            "PutCloudWatchMetricsPolicy",
+            statements=[
+                PolicyStatement(
+                    effect=Effect.ALLOW,
+                    actions=["cloudwatch:PutMetricData"],
+                    resources=["*"],
+                    conditions={
+                        "StringEquals": {
+                            "cloudwatch:namespace": self.node.try_get_context("METRICS_NAMESPACE")
+                        }
+                    }
+                )
+            ]
+        )
+
+        add_cfn_nag_suppressions(
+            cloudwatch_metrics_policy.node.default_child,
+            LOGGING_SUPRESSION
+        )
+
+        for lambda_function in lambda_function_list:
+            cloudwatch_metrics_policy.attach_to_role(lambda_function.role)
 
     def _suppress_cfn_nag_warnings(self):
         Aspects.of(self).add(

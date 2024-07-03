@@ -25,7 +25,7 @@ def handler(event, context):
     event['EXECUTION_RUNNING_LAMBDA_NAME'] = context.function_name
     customer_config = event['customerConfig']
     # set up the AMC API Interface
-    wfm = wfm_amc_api_interface.AMCAPIInterface(customer_config, logger, utils)
+    wfm = wfm_amc_api_interface.AMCAPIs(customer_config, utils)
 
     # get the execution Request
     workflow_request = event.get('workflowRequest', {})
@@ -35,7 +35,7 @@ def handler(event, context):
 
     amc_response = wfm.create_workflow(workflow_definition, True)
     event.update(amc_response.response)
-    
+
     if amc_response.success:
         utils.dynamodb_put_item(WORKFLOWS_TABLE_NAME, event)
 

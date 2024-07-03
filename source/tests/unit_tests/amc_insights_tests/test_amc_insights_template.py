@@ -4,12 +4,11 @@
 This module is responsible for top-level tests against the template.
 It does not test individual resources.
 """
-
-# source/amc_insights_tests/test_amc_insights_template.py
+import shutil
 
 from pathlib import Path
 import pytest
-
+import os
 from aws_cdk import App
 from amc_insights.amc_insights_stack import AMCInsightsStack
 from aws_cdk.assertions import Template
@@ -25,6 +24,10 @@ def mock_solution():
 
 @pytest.fixture(scope="module")
 def template(mock_solution):
+    solution_helper_build_path = Path(__file__).parent.parent.parent.parent / "cdk_solution_helper_py" / "helpers_common" / "build"
+    if os.path.isdir(solution_helper_build_path):
+        shutil.rmtree(solution_helper_build_path)
+
     app = App(context=mock_solution.context.context)
     stack = AMCInsightsStack(
         app,
@@ -33,6 +36,9 @@ def template(mock_solution):
         template_filename=AMCInsightsStack.template_filename,
         synthesizer=mock_solution.synthesizer)
     yield Template.from_stack(stack)
+
+
+STOCK_BASIC_EXECUTION_ROLE_COUNT = 30
 
 
 def test_resource_counts(template):
@@ -105,3 +111,140 @@ def test_stack_parameters(template):
     template.find_parameters("Pipeline")
     template.find_parameters("EnvironmentId")
     template.find_parameters("BootstrapVersion")
+
+
+def test_cloudtrail_policy(template):
+    # test the cloudtrail bucket policy
+    template.has_resource(
+        "AWS::S3::BucketPolicy", {
+            "Properties": {
+                "Bucket": {
+                    "Ref": "bucketscloudtrail96A55974"
+                },
+                "PolicyDocument": {
+                    "Statement": [
+                        {
+                            "Action": "s3:*",
+                            "Condition": {
+                                "Bool": {
+                                    "aws:SecureTransport": "false"
+                                }
+                            },
+                            "Effect": "Deny",
+                            "Principal": {
+                                "AWS": "*"
+                            },
+                            "Resource": [
+                                {
+                                    "Fn::GetAtt": [
+                                        "bucketscloudtrail96A55974",
+                                        "Arn"
+                                    ]
+                                },
+                                {
+                                    "Fn::Join": [
+                                        "",
+                                        [
+                                            {
+                                                "Fn::GetAtt": [
+                                                    "bucketscloudtrail96A55974",
+                                                    "Arn"
+                                                ]
+                                            },
+                                            "/*"
+                                        ]
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "Action": "s3:GetBucketAcl",
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "cloudtrail.amazonaws.com"
+                            },
+                            "Resource": {
+                                "Fn::GetAtt": [
+                                    "bucketscloudtrail96A55974",
+                                    "Arn"
+                                ]
+                            }
+                        },
+                        {
+                            "Action": "s3:PutObject",
+                            "Condition": {
+                                "StringEquals": {
+                                    "s3:x-amz-acl": "bucket-owner-full-control"
+                                }
+                            },
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": "cloudtrail.amazonaws.com"
+                            },
+                            "Resource": {
+                                "Fn::Join": [
+                                    "",
+                                    [
+                                        {
+                                            "Fn::GetAtt": [
+                                                "bucketscloudtrail96A55974",
+                                                "Arn"
+                                            ]
+                                        },
+                                        "/AWSLogs/",
+                                        {
+                                            "Ref": "AWS::AccountId"
+                                        },
+                                        "/*"
+                                    ]
+                                ]
+                            }
+                        }
+                    ],
+                    "Version": "2012-10-17"
+                }
+            },
+        })
+
+def test_lambda_function_roles(template):
+    """
+    Testing only selected roles in the template
+    """
+    # related to most Lambda functions for basic execution role
+    found = template.find_resources(
+        "AWS::IAM::Role", {
+            "Properties": {
+                "AssumeRolePolicyDocument": {
+                    "Statement": [{
+                        "Action": "sts:AssumeRole",
+                        "Effect": "Allow",
+                        "Principal": {
+                            "Service": "lambda.amazonaws.com"
+                        }
+                    }],
+                    "Version":
+                    "2012-10-17"
+                },
+                "ManagedPolicyArns": [{
+                    "Fn::Join": [
+                        "",
+                        [
+                            "arn:", {
+                                "Ref": "AWS::Partition"
+                            },
+                            ":iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+                        ]
+                    ]
+                }]
+            }
+        })
+    assert len(found) == STOCK_BASIC_EXECUTION_ROLE_COUNT
+    
+# security-focused test cases
+def test_security_options(template):
+    from ..amc_insights_tests.security import s3_buckets, sagemaker, wfm_secret
+    
+    s3_buckets.test_bucket_security(template)
+    sagemaker.test_sagemaker_security(template)
+    wfm_secret.test_wfm_secrets_security(template)
+    

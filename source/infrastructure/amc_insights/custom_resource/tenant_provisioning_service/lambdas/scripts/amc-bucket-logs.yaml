@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Resources:
+  #####################################
+  ###     S3 ACCESS LOGS BUCKET     ###
+  #####################################
+  Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: True
+        BlockPublicPolicy: True
+        IgnorePublicAcls: True
+        RestrictPublicBuckets: True
+
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    DeletionPolicy: Retain
+    Properties:
+      Bucket: !Ref Bucket
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Deny
+            Principal: "*"
+            Action: "s3:*"
+            Resource:
+              - !GetAtt Bucket.Arn
+              - !Sub "arn:aws:s3:::${Bucket}/*"
+            Condition:
+              Bool:
+                aws:SecureTransport: false
+          - Sid: "S3ServerAccessLogsPolicy"
+            Effect: Allow
+            Principal:
+              Service:
+                - logging.s3.amazonaws.com
+            Action: "s3:PutObject"
+            Resource:
+              - !Sub "arn:aws:s3:::${Bucket}/*"
+              - !GetAtt Bucket.Arn
+            Condition:
+              ArnLike:
+                aws:SourceArn:
+                  - "arn:aws:s3:::amc*"
+              StringEquals:
+                aws:SourceAccount: !Sub "${AWS::AccountId}"
+
+Outputs:
+  S3LogsBucketName:
+    Value: !Ref Bucket

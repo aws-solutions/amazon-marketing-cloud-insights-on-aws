@@ -27,7 +27,7 @@ def handler(event, context):
     customer_config = event['customerConfig']
 
     # set up the AMC API Interface
-    wfm = wfm_amc_api_interface.AMCAPIInterface(customer_config, logger, Utils)
+    wfm = wfm_amc_api_interface.AMCAPIs(customer_config, Utils)
 
     # get the execution Request
     execution_request = event.get('executionRequest', {})
@@ -82,7 +82,7 @@ def handler(event, context):
         event['executionsSummary'] = executions_summary
 
     else:
-        message = f"failed to receive execution statuses for customerId: {wfm.config['customerId']}"
+        message = f"failed to receive execution statuses for customerId: {wfm.customer_config['customerId']}"
         logger.error(message)
 
     return event

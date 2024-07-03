@@ -27,7 +27,7 @@ def handler(event, context):
     customer_config = event['customerConfig']
 
     # set up the AMC API Interface
-    wfm = wfm_amc_api_interface.AMCAPIInterface(customer_config, logger, utils)
+    wfm = wfm_amc_api_interface.AMCAPIs(customer_config, utils)
 
     # get the execution Request
     execution_request = event.get('executionRequest', {})
@@ -36,7 +36,7 @@ def handler(event, context):
     amc_response = wfm.cancel_workflow_execution(execution_request['workflowExecutionId'])
     event.update(amc_response.response)
     if amc_response.success:
-        message = f"Successfully cancelled execution {event.get('workflowId', '')} {event.get('workflowExecutionId', '')}for customerId: {wfm.config['customerId']}"
+        message = f"Successfully cancelled execution {event.get('workflowId', '')} {event.get('workflowExecutionId', '')}for customerId: {wfm.customer_config['customerId']}"
         logger.info(message)
 
         # copy the workflow execution ID into the execution request section of the event.
@@ -45,7 +45,7 @@ def handler(event, context):
         utils.dynamodb_put_item(EXECUTION_STATUS_TABLE, event)
 
     else:
-        message = f"Unable to cancel execution {event.get('workflowId', '')} {event.get('workflowExecutionId', '')} for customerId: {wfm.config['customerId']} response code {amc_response.status_code}"
+        message = f"Unable to cancel execution {event.get('workflowId', '')} {event.get('workflowExecutionId', '')} for customerId: {wfm.customer_config['customerId']} response code {amc_response.status_code}"
         logger.error(message)
 
     return event

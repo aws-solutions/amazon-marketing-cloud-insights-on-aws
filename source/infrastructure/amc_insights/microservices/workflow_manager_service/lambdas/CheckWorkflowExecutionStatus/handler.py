@@ -27,7 +27,7 @@ def handler(event, context):
     customer_config = event['customerConfig']
 
     # set up the AMC API Interface
-    wfm = wfm_amc_api_interface.AMCAPIInterface(customer_config, logger, Utils)
+    wfm = wfm_amc_api_interface.AMCAPIs(customer_config, Utils)
 
     # get the execution Request
     execution_request = event.get('executionRequest', {})
@@ -36,13 +36,13 @@ def handler(event, context):
     event.update(amc_response.response)
 
     if amc_response.success:
-        message = f"Successfully received status for execution {event.get('workflowId', '')} {event.get('workflowExecutionId', '')}for customerId: {wfm.config['customerId']}"
+        message = f"Successfully received status for execution {event.get('workflowId', '')} {event.get('workflowExecutionId', '')}for customerId: {wfm.customer_config['customerId']}"
         logger.info(message)
 
         Utils.dynamodb_put_item(EXECUTION_STATUS_TABLE, event)
 
     else:
-        message = f"failed to receive status for execution {event.get('workflowId', '')} {event.get('workflowExecutionId', '')}for customerId: {wfm.config['customerId']}"
+        message = f"failed to receive status for execution {event.get('workflowId', '')} {event.get('workflowExecutionId', '')}for customerId: {wfm.customer_config['customerId']}"
         logger.error(message)
 
     return event

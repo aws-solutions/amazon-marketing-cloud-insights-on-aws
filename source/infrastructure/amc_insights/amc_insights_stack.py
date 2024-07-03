@@ -3,10 +3,10 @@
 
 import os
 from pathlib import Path
-from typing import Any
+from typing import Any, List, Dict
 from constructs import Construct
-
-from aws_solutions.cdk.cfn_nag import CfnNagSuppressAll, CfnNagSuppression
+from dataclasses import dataclass
+from aws_solutions.cdk.cfn_nag import CfnNagSuppressAll, CfnNagSuppression, CfnGuardSuppressAll
 from data_lake.foundations.foundations_construct import FoundationsConstruct
 from data_lake.pipelines.sdlf_pipeline import SDLFPipelineConstruct
 from data_lake.datasets import SDLFDatasetConstruct
@@ -22,17 +22,35 @@ from amc_insights.solution_buckets.solution_buckets import SolutionBuckets
 from amc_insights.integration.integration_construct import IntegrationConstruct
 from amc_insights.app_registry import AppRegistry
 from amc_insights.custom_resource.user_scripts.user_scripts_construct import UserScriptsCustomResource
-from amc_insights.custom_resource.user_iam import UserIam
+from amc_insights.admin_policy.admin_policy_construct import AdminPolicy
 from amc_insights.custom_resource.lakeformation_settings.lakeformation_settings import LakeformationSettings
-from amc_insights.custom_resource.cloudtrail.cloudtrail_construct import CloudTrailConstruct
+from amc_insights.cloudtrail.cloudtrail_integration import CloudTrailIntegration
 
 
-class _AMCDataset:
-    def __init__(self):
-        self.dataset = "amc"
-        self.pipeline = "insights"
-        self.stage_a_transform = "amc_light_transform"
-        self.stage_b_transform = "amc_heavy_transform"
+@dataclass
+class AMCDataset:
+    dataset = "amc"
+    pipeline = "insights"
+    stage_a_transform = "amc_light_transform"
+    stage_b_transform = "amc_heavy_transform"
+
+
+@dataclass
+class DataLakes:
+    """This data class collects all resources created for Data Lake
+    """
+    foundation: FoundationsConstruct
+    sdlf_pipelines: Dict[str, SDLFPipelineConstruct]
+    datasets: Dict[str, SDLFDatasetConstruct]
+
+
+@dataclass
+class Microservice:
+    """This data class collects all resources created for microservice.
+    """
+    tps: TenantProvisioningService
+    wfm: WorkFlowManagerService
+    pmn: PlatformManagerSageMaker
 
 
 class AMCInsightsStack(SolutionStack):
@@ -45,14 +63,12 @@ class AMCInsightsStack(SolutionStack):
         self.synthesizer.bind(self)
 
         # Aspects
-        self._suppress_cfn_nag_warnings_on_lambdas()
+        self._suppress_cfn_nag_warnings_on_stack()
         Aspects.of(self).add(AppRegistry(self, f'AppRegistry-{id}'))
 
         self._environment_id = "dev"
         self._team = "adtech"
-        self._amc_dataset = _AMCDataset()
         self._config_file_path = os.path.join(f"{Path(__file__).parent.parent}", "datasets_parameters.json")
-        self.sdlf_dataset_constructs = []
 
         self._create_template_parameters()
 
@@ -101,13 +117,6 @@ class AMCInsightsStack(SolutionStack):
             "cloudwatch-metrics"
         )
 
-        # Cloud Trail
-        cloudtrail_construct = CloudTrailConstruct(
-            self, "cloudtrail",
-            solution_buckets_resources=solution_buckets_construct,
-            data_lake_enabled=self._is_creating_datalake
-        )
-
         ######################################
         #       DATA LAKE CONSTRUCTS         #
         ######################################
@@ -121,7 +130,7 @@ class AMCInsightsStack(SolutionStack):
                                                             environment_id=self._environment_id,
                                                             team=self._team,
                                                             foundations_resources=foundations_construct,
-                                                            pipeline=self._amc_dataset.pipeline,
+                                                            pipeline=AMCDataset.pipeline,
                                                             creating_resources_condition=self._is_creating_datalake_condition
                                                             )
 
@@ -131,10 +140,16 @@ class AMCInsightsStack(SolutionStack):
                                                      team=self._team,
                                                      solution_buckets=solution_buckets_construct,
                                                      foundations_resources=foundations_construct,
-                                                     dataset_parameters=self._amc_dataset,
-                                                     creating_resources_condition=self._is_creating_datalake_condition
+                                                     sdlf_pipeline_stage_b=insights_pipeline_construct.stage_b_transform,
+                                                     dataset_parameters=AMCDataset,
+                                                     creating_resources_condition=self._is_creating_datalake_condition,
                                                      )
-        self.sdlf_dataset_constructs.append(amc_dataset_construct)
+
+        # Reference resources in the Data Lake.
+        self.data_lakes = DataLakes(foundation=foundations_construct,
+                                    sdlf_pipelines={AMCDataset.pipeline: insights_pipeline_construct},
+                                    datasets={AMCDataset.dataset: amc_dataset_construct},
+                                    )
 
         # Additional Datasets & Pipelines
         # Check if entries were added
@@ -143,41 +158,36 @@ class AMCInsightsStack(SolutionStack):
                 environment_id=self._environment_id,
                 config_file_path=self._config_file_path).dataset_configs
 
-            dataset_names = set()
-            pipeline_names = set()
-
-            # Do not recreate amc dataset or insights pipeline
-            dataset_names.add(self._amc_dataset.dataset)
-            pipeline_names.add(self._amc_dataset.pipeline)
-
             for dataset_parameters in datasets_configs:
                 # Create new pipeline if not using insights pipeline
                 pipeline_name = dataset_parameters.pipeline
-                if pipeline_name not in pipeline_names:
-                    pipeline_names.add(pipeline_name)
-                    SDLFPipelineConstruct(self, "data-lake-pipeline",
-                                          environment_id=self._environment_id,
-                                          team=self._team,
-                                          foundations_resources=foundations_construct,
-                                          dataset_parameters=dataset_parameters,
-                                          creating_resources_condition=self._is_creating_datalake_condition,
-                                          )
+                if pipeline_name not in self.data_lakes.sdlf_pipelines.keys():
+                    sdlf_pipeline = SDLFPipelineConstruct(self, f"data-lake-{pipeline_name}-pipeline",
+                                                          environment_id=self._environment_id,
+                                                          team=self._team,
+                                                          foundations_resources=foundations_construct,
+                                                          pipeline=pipeline_name,
+                                                          creating_resources_condition=self._is_creating_datalake_condition,
+                                                          )
+                    # Add the new pipeline to the dataclass DataLakes for future reference.
+                    self.data_lakes.sdlf_pipelines[pipeline_name] = sdlf_pipeline
 
                 # Register datasets to the pipeline with concrete transformations and glue job
                 dataset_name = dataset_parameters.dataset
-                if dataset_name not in dataset_names:
-                    dataset_names.add(dataset_name)
+                if dataset_name not in self.data_lakes.datasets.keys():
                     sdlf_dataset = SDLFDatasetConstruct(
                         self,
                         f"data-lake-dataset-{dataset_name}",
                         environment_id=self._environment_id,
                         team=self._team,
                         foundations_resources=foundations_construct,
+                        sdlf_pipeline_stage_b=self.data_lakes.sdlf_pipelines.get(pipeline_name).stage_b_transform,
                         dataset_parameters=dataset_parameters,
                         solution_buckets=solution_buckets_construct,
                         creating_resources_condition=self._is_creating_datalake_condition,
                     )
-                    self.sdlf_dataset_constructs.append(sdlf_dataset)
+                    # Add the new data to the dataclass DataLakes for future reference.
+                    self.data_lakes.datasets[dataset_name] = sdlf_dataset
 
         ######################################
         #    AMC MICROSERVICE CONSTRUCTS     #
@@ -191,11 +201,10 @@ class AMCInsightsStack(SolutionStack):
         # TPS
         tps_construct = TenantProvisioningService(self, "tps",
                                                   team=self._team,
-                                                  dataset=self._amc_dataset.dataset,
+                                                  dataset=AMCDataset.dataset,
                                                   workflow_manager_resources=wfm_construct,
                                                   solution_buckets=solution_buckets_construct,
                                                   creating_resources_condition=self._is_creating_microservices_condition,
-                                                  cloudtrail_resources=cloudtrail_construct,
                                                   data_lake_enabled=self._is_creating_datalake)
 
         # PMN
@@ -207,6 +216,9 @@ class AMCInsightsStack(SolutionStack):
                                                  solution_buckets=solution_buckets_construct,
                                                  creating_resources_condition=self._is_creating_microservices_condition)
 
+        # Reference resources in the Microservice.
+        self.microservice = Microservice(tps=tps_construct, wfm=wfm_construct, pmn=pmn_construct)
+
         ######################################
         #     FULL APPLICATION CONSTRUCTS    #
         ######################################
@@ -217,15 +229,14 @@ class AMCInsightsStack(SolutionStack):
                              creating_resources_condition=self._is_deplopying_full_app_condition
                              )
 
-        UserIam(self, "useriam",
+        AdminPolicy(self, "admin-policy",
                 solution_buckets=solution_buckets_construct,
-                tps_resources=tps_construct,
-                wfm_resources=wfm_construct,
-                pmn_resources=pmn_construct,
+                microservice=self.microservice,
                 foundations_resources=foundations_construct,
                 insights_pipeline_resources=insights_pipeline_construct,
                 amc_dataset_resources=amc_dataset_construct,
-                creating_resources_condition=self._is_deplopying_full_app_condition
+                creating_resources_condition=self._is_deplopying_full_app_condition,
+                amc_secret=wfm_construct.amc_secrets_manager
                 )
 
         ######################################
@@ -234,12 +245,20 @@ class AMCInsightsStack(SolutionStack):
         LakeformationSettings(
             self,
             "lakeformation-settings",
-            dataset_resources=self.sdlf_dataset_constructs,
+            dataset_resources=self.data_lakes.datasets.values(),
             pmn_resources=pmn_construct,
             datalake_condition=self._is_creating_datalake_condition,
             microservice_condition=self._is_creating_microservices_condition
         )
 
+        CloudTrailIntegration(
+            self, "cloudtrail",
+            solution_buckets_resources=solution_buckets_construct,
+            is_creating_datalake=self._is_creating_datalake,
+            is_creating_microservice=self._is_creating_microservices,
+            datalake=self.data_lakes,
+            microservice=self.microservice
+        )
 
     def _create_template_parameters(self):
         self._email_param = CfnParameter(
@@ -270,7 +289,7 @@ class AMCInsightsStack(SolutionStack):
             default="Yes"
         )
 
-    def _suppress_cfn_nag_warnings_on_lambdas(self):
+    def _suppress_cfn_nag_warnings_on_stack(self):
         Aspects.of(self).add(
             CfnNagSuppressAll(
                 [
@@ -295,7 +314,42 @@ class AMCInsightsStack(SolutionStack):
                     CfnNagSuppression(
                         rule_id="W84",
                         reason="CloudWatchLogs LogGroup should specify a KMS Key Id to encrypt the log data"),
+                    CfnNagSuppression(
+                        rule_id="W86",
+                        reason="Log retention period is set to INFINITE instead of DAYS"),
                 ],
                 "AWS::Logs::LogGroup"
+            )
+        )
+        Aspects.of(self).add(
+            CfnNagSuppressAll(
+                [
+                    CfnNagSuppression(
+                        rule_id="F10",
+                        reason="Lambda functions with unique permissions use inline policies"),
+                ],
+                "AWS::IAM::Role"
+            )
+        )
+        Aspects.of(self).add(
+            CfnGuardSuppressAll(
+                suppress=["CFN_NO_EXPLICIT_RESOURCE_NAMES"],
+                resource_type="AWS::DynamoDB::Table"
+            )
+        )
+        Aspects.of(self).add(
+            CfnNagSuppressAll(
+                [
+                    CfnNagSuppression(
+                        rule_id="W28",
+                        reason="Third party dependency DDK Octagon tables require given resource names for functionality"),
+                ],
+                "AWS::DynamoDB::Table"
+            ),
+        )
+        Aspects.of(self).add(
+            CfnGuardSuppressAll(
+                suppress=["IAM_POLICYDOCUMENT_NO_WILDCARD_RESOURCE"],
+                resource_type="AWS::IAM::Role"
             )
         )

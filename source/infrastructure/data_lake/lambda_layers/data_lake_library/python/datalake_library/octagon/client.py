@@ -17,8 +17,8 @@ from ..commons import init_logger
 class OctagonClient:
     def __init__(self):
         self.logger = init_logger()
-        self.region = "us-east-1"
-        self.profile = "default"
+        self.region = os.environ.get("AWS_REGION", "us-east-1") or "us-east-1"
+        self.profile = os.environ.get("AWS_PROFILE", os.environ.get("AWS_DEFAULT_PROFILE", "default")) or "default"
         self.configuration_file = pkg_resources.resource_filename(__name__, "octagon-configuration.json")
         self.configuration_instance = "dev"
         self.metadata_file = pkg_resources.resource_filename(__name__, "octagon-metadata.json")

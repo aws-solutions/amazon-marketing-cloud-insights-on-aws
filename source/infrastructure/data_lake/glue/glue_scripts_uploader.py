@@ -1,6 +1,6 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
-
+import uuid
 from aws_cdk.aws_iam import PolicyStatement
 import aws_cdk.aws_iam as iam
 import aws_cdk.aws_lambda as lambda_
@@ -78,7 +78,7 @@ class GlueScriptsUploader(Construct):
             "CreateSDLFHeavyTransformGlueScript",
             GLUE_CUSTOM_RESOURCE_PATH / "glue" / "lambdas" /"sync_sdlf_heavy_transform_glue_script.py",
             "event_handler",
-            runtime=lambda_.Runtime.PYTHON_3_9,
+            runtime=lambda_.Runtime.PYTHON_3_11,
             function_name=f"{self._resource_prefix}-upload-{self._dataset}-glue-script",
             description="Place the glue script of sdlf heavy transform to the S3 artifacts bucket",
             timeout=Duration.minutes(5),
@@ -119,7 +119,8 @@ class GlueScriptsUploader(Construct):
                 "artifacts_bucket_name": self._solution_buckets.artifacts_bucket.bucket_name,
                 "artifacts_object_key": self._glue_script_path,
                 "glue_script_file": self._glue_script_local_file_path,
-                "amc_dataset_version": "2.0.2"
+                "amc_dataset_version": "3.0.0",
+                "custom_resource_uuid": str(uuid.uuid4())  # random uuid to trigger redeploy on stack update
             },
         )
         self._sdlf_heavy_transform_glue_script_custom_resource.node.add_dependency(

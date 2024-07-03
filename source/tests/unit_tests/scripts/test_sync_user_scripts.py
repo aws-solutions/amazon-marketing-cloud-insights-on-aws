@@ -62,18 +62,6 @@ def test_on_create_or_update(resource_properties):
         on_create_or_update({"ResourceProperties": {}}, None)
 
 
-@mock_dir_files()
-def test_on_delete(resource_properties):
-    with patch("scripts.sync_user_scripts.delete_bucket_contents") as delete_bucket_contents_mock:
-        from scripts.sync_user_scripts import on_delete
-
-        on_delete({"ResourceProperties":resource_properties, "PhysicalResourceId": 12345}, None)
-        delete_bucket_contents_mock.assert_called_once()
-
-    # cover exception
-    with pytest.raises(Exception):
-        on_delete({"ResourceProperties": {}}, None)
-
 
 @patch("scripts.sync_user_scripts.helper")
 def test_event_handler(helper_mock):

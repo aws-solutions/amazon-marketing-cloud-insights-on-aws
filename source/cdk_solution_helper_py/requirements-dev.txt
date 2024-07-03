@@ -1,7 +1,7 @@
 aws_cdk_lib>=2.45.0
 black
 boto3>=1.17.49
-requests>=2.28.1
+requests>=2.32.0
 crhelper>=2.0.6
 Click
 moto

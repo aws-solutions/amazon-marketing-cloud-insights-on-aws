@@ -74,32 +74,6 @@ def test_on_create_or_update_exception(__mock_imports):
         on_create_or_update({"ResourceProperties": "12345"}, None)
 
 
-def test_on_delete_exception(__mock_imports):
-    from amc_insights.custom_resource.platform_management_service.lambdas.sync_platform_manager import on_delete
-    with pytest.raises(Exception):
-        on_delete({"ResourceProperties": "12345"}, None)
-
-
-@pytest.mark.parametrize(
-    "lambda_event",
-    [
-        {
-            "ResourceProperties":
-                {
-                    "artifacts_bucket_name": "artifacts_bucket",
-                    "artifacts_key_prefix": "platform_notebook_manager_samples/",
-                },
-            "RequestType": "Delete",
-            "PhysicalResourceId": "id",
-        }
-    ],
-)
-def test_on_delete(lambda_event, __mock_imports, _mock_clients, _mock_functions):
-    from amc_insights.custom_resource.platform_management_service.lambdas.sync_platform_manager import on_delete
-    on_delete(lambda_event, None)
-    _helpers_service_clients['s3'].delete_object.assert_called_once()
-
-
 @patch("amc_insights.custom_resource.platform_management_service.lambdas.sync_platform_manager.helper")
 def test_event_handler(mock_helper, __mock_imports):
     from amc_insights.custom_resource.platform_management_service.lambdas.sync_platform_manager import event_handler

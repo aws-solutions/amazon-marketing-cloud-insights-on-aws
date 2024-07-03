@@ -41,27 +41,9 @@ def on_create_or_update(event, _) -> None:
 @helper.delete
 def on_delete(event, _):
     """
-    This function is responsible for removing platform manager from the s3 artifact bucket.
+    This function takes no action when the custom resource is deleted as the bucket and contents are retained.
     """
-    logger.info(f"Custom Resource marked for deletion: {event['PhysicalResourceId']}")
-    resource_properties = event["ResourceProperties"]
-    try:
-        delete_bucket_contents(resource_properties)
-    except Exception as err:
-        logger.error(err)
-        raise err
-    logger.info("Platform manager is deleted.")
-
-
-def delete_bucket_contents(resource_properties) -> None:
-    s3_client = get_service_client("s3")
-    for file in list_files_to_sync(PLATFORM_MANAGER_DIR):
-        artifacts_bucket_name, object_key = get_bucket_name_and_key(resource_properties, file)
-        s3_client.delete_object(
-            Bucket=artifacts_bucket_name,
-            Key=object_key
-        )
-        logger.info(f"Deleted {object_key}")
+    logger.info("Custom Resource marked for deletion. No Action needed.")
 
 
 def upload_bucket_contents(resource_properties) -> None:

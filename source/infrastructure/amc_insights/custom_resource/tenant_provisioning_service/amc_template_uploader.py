@@ -1,12 +1,13 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
+import uuid 
 
-from aws_cdk.aws_lambda import Code, LayerVersion, Runtime, Function, Architecture
+from aws_cdk.aws_lambda import Runtime, Architecture
 from constructs import Construct
 
 import aws_cdk.aws_iam as iam
 
-from aws_cdk import Duration, CustomResource, Aws, CfnCondition
+from aws_cdk import Duration, CustomResource, Aws
 
 from aws_lambda_layers.aws_solutions.layer import SolutionsLayer
 from aws_solutions.cdk.aws_lambda.layers.aws_lambda_powertools import PowertoolsLayer
@@ -113,6 +114,7 @@ class AMCTemplateUploader(Construct):
             properties={
                 "artifacts_bucket_name": self._solution_buckets.artifacts_bucket.bucket_name,
                 "artifacts_key_prefix": f"{self._microservice_name}/scripts/{self._team}/",
+                "custom_resource_uuid": str(uuid.uuid4()) # random uuid to trigger redeploy on stack update
             },
         )
         self._amc_initialize_template_custom_resource.node.add_dependency(self._sync_cfn_template_lambda_iam_policy)

@@ -28,12 +28,8 @@ def apply_handler_env():
 def test_handler():
     from amc_insights.microservices.workflow_manager_service.lambdas.UpdateWorkflow.handler import handler
 
-    test_arn = "arn:aws:iam::123456789012:role/Test/test_12345/test_role"
-
     customer_config = {
-        "invokeAmcApiRoleArn": test_arn,
-        "amcApiEndpoint": "https://test-url.com",
-        "amcRegion": os.environ["AWS_DEFAULT_REGION"]
+
     }
 
     test_event = {
@@ -45,7 +41,7 @@ def test_handler():
 
     with (
         patch("wfm_amc_api_interface.wfm_amc_api_interface.AMCAPIResponse") as amc_response_mock,
-        patch("wfm_amc_api_interface.wfm_amc_api_interface.AMCAPIInterface") as amc_interface_mock,
+        patch("wfm_amc_api_interface.wfm_amc_api_interface.AMCAPIs") as amc_interface_mock,
         patch("wfm_utilities.wfm_utilities.Utils")
     ):
         amc_interface_mock.return_value = MagicMock(config={"customerId": 12345})
@@ -65,8 +61,8 @@ def test_handler():
             }
             dynamodb.create_table(**params)
             event = handler(event=test_event, context=MagicMock(function_name="test_name"))
-            assert event == {'workflowId': 12345, 'customerConfig': {'invokeAmcApiRoleArn': 'arn:aws:iam::123456789012:role/Test/test_12345/test_role', 'amcApiEndpoint': 'https://test-url.com', 'amcRegion': 'us-east-1'}, 'workflowRequest': {'workflowDefinition': {'workflowId': 12345}}, 'EXECUTION_RUNNING_LAMBDA_NAME': 'test_name'}
+            assert event == {'workflowId': 12345, 'customerConfig': {}, 'workflowRequest': {'workflowDefinition': {'workflowId': 12345}}, 'EXECUTION_RUNNING_LAMBDA_NAME': 'test_name'}
             amc_response_mock.return_value.update_workflow.return_value = MagicMock(success=False, response={})
             test_event["workflowRequest"] = {"workflowDefinition": {"workflowId": 12345}}
             event = handler(event=test_event, context=MagicMock(function_name="test_name"))
-            assert event == {'workflowId': 12345, 'customerConfig': {'invokeAmcApiRoleArn': 'arn:aws:iam::123456789012:role/Test/test_12345/test_role', 'amcApiEndpoint': 'https://test-url.com', 'amcRegion': 'us-east-1'}, 'workflowRequest': {'workflowDefinition': {'workflowId': 12345}}, 'EXECUTION_RUNNING_LAMBDA_NAME': 'test_name'}
+            assert event == {'workflowId': 12345, 'customerConfig': {}, 'workflowRequest': {'workflowDefinition': {'workflowId': 12345}}, 'EXECUTION_RUNNING_LAMBDA_NAME': 'test_name'}
