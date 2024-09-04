@@ -12,7 +12,13 @@ The following images show the architecture of the solution and its components
 ![Architecture 2](images/architecture-wfm.png)
 *Workflow Manager* 
 
-![Architecture 3](images/architecture-datalake.png)
+![Architecture 4](images/architecture-amazon-ads-reporting.png)
+*Amazon Ads Reporting*
+
+![Architecture 5](images/architecture-selling-partner-reporting.png)
+*Selling Partner Reporting*
+
+![Architecture 6](images/architecture-datalake.png)
 *Data Lake*
 
 **Note**: From v2.0.0, AWS CloudFormation template resources are created by the [AWS CDK](https://aws.amazon.com/cdk/)
@@ -48,9 +54,9 @@ the AWS Well-Architected Framework.
 
 ---
 
-### IAM Roles for Installation and Operation
+### IAM Roles for Installation and Admin Operation
 
-An IAM policy for installing the solution is listed within the `IAM_POLICY_INSTALL.json` file. An IAM policy for operating the solution is created on stack deployment with a name prefix of `{stack-name}-adminpolicy`. A link to this policy can be found in the Outputs window of your Cloudformation stack under the AdminPolicyOutput key. Note: the policy generated should be used as a guide. Please review it as it may need to be amended in order to fit your specific use case.
+An IAM policy for installing the solution is listed within the `IAM_POLICY_INSTALL.json` file. IAM policies for operating the solution as an admin are created on stack deployment and can be found in the Outputs window of your Cloudformation stack under the `AdminPolicyOutput` key. Note: the policies generated should be used as a guide. Please review them as they may need to be amended in order to fit your specific use case.
 
 These JSON files can be used to create a JSON policy in AWS IAM to scope the actions available to a user so they can install and operate the solution.
 

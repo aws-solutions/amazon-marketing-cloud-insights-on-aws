@@ -1,12 +1,13 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from aws_solutions.core.helpers import get_service_resource, get_service_client
-from aws_solutions.extended.resource_lookup import ResourceLookup
 import os
 import json
 from aws_lambda_powertools import Logger
 from botocore.exceptions import ClientError
+
+from aws_solutions.core.helpers import get_service_resource, get_service_client
+from aws_solutions.extended.resource_lookup import ResourceLookup
 from cloudwatch_metrics import metrics
 
 logger = Logger(service="Tenant Provisioning Service", level="INFO")
@@ -118,11 +119,31 @@ def put_amc_bucket_policy(amc_orange_aws_account, bucket_account, bucket_name):
         raise
 
 
-def check_and_assign_bucket_policy(event):
-    amc_orange_aws_account = event.get("amcOrangeAwsAccount")
-    bucket_name = event.get("BucketName")
-    bucket_account = event.get("bucketAccount")
+def enable_eventbridge_notifications(bucket_name):
+    try:
+        response = s3_client.put_bucket_notification_configuration(
+            Bucket=bucket_name,
+            NotificationConfiguration={
+                'EventBridgeConfiguration': {}
+            }
+        )
+        return response
+    except Exception as error:
+        logger.exception(
+            f"""
+            Failed to enable EventBridge notifications for {bucket_name}, error: {error}.
+            """
+        )
+        raise
 
+
+def check_and_assign_bucket_settings(event):
+    amc_orange_aws_account = event["amcOrangeAwsAccount"]
+    bucket_name = event["BucketName"]
+    bucket_account = event["bucketAccount"]
+    responses = []
+
+    # Verify that an AMC bucket policy is in place. If no policy exists, create and assign one.
     try:
         response = s3_client.get_bucket_policy(
             Bucket=bucket_name,
@@ -130,9 +151,23 @@ def check_and_assign_bucket_policy(event):
 
     except s3_client.exceptions.from_code('NoSuchBucketPolicy'):
         logger.info(f"Add bucket policy to AMC S3 bucket {bucket_name}")
-        response = put_amc_bucket_policy(amc_orange_aws_account, bucket_account, bucket_name)
-
-    return response
+        policy_response = put_amc_bucket_policy(amc_orange_aws_account, bucket_account, bucket_name)
+        responses.append(policy_response)
+        
+    # Verify that EventBridge notifications are enabled. If not, enable for the bucket.
+    try:
+        response = s3_client.get_bucket_notification_configuration(
+            Bucket=bucket_name,
+        )
+        if 'EventBridgeConfiguration' not in response:
+            logger.info(f"Enable EventBridge notifications for {bucket_name}")
+            eventbridge_response = enable_eventbridge_notifications(bucket_name=bucket_name)
+            responses.append(eventbridge_response)
+            
+    except Exception as e:
+        logger.error(f"Error configuring EventBridge notifications. This setting may have to be turned on manually from the S3 console: {e}")
+            
+    return responses
 
 
 def handler(event, _):
@@ -157,9 +192,9 @@ def handler(event, _):
                     f"AMC Bucket exists {event['bucketExists']} in {event['bucketAccount']}. Do not enable access logs")
 
             if (event['bucketAccount'] == AWS_ACCOUNT_ID) and (event['bucketExists'] == "true"):
-                # Verify that an AMC bucket policy is in place. If no policy exists, create and assign one.
-                bucket_policy_response = check_and_assign_bucket_policy(event)
-                response_list.append(bucket_policy_response)
+                # Verify that the AMC bucket has the proper settings configured to allow data ingress/egress.
+                bucket_settings_responses = check_and_assign_bucket_settings(event)
+                response_list += bucket_settings_responses
 
             logger.info('Updating Metadata in DDB')
 
@@ -178,6 +213,7 @@ def handler(event, _):
                 "amcInstanceId": event['amcInstanceId'],
                 "amcAmazonAdsAdvertiserId": event['amcAmazonAdsAdvertiserId'],
                 "amcAmazonAdsMarketplaceId": event['amcAmazonAdsMarketplaceId'],
+                "authId": event.get("authId", None),
             }
             tps_response = put_item(tps_customer_table, tps_item)
             response_list.append(tps_response)
@@ -214,7 +250,8 @@ def handler(event, _):
                 "amcInstanceId": event['amcInstanceId'],
                 "amcAmazonAdsAdvertiserId": event['amcAmazonAdsAdvertiserId'],
                 "amcAmazonAdsMarketplaceId": event['amcAmazonAdsMarketplaceId'],
-                "outputSNSTopicArn": event["snsTopicArn"]
+                "outputSNSTopicArn": event["snsTopicArn"],
+                "authId": event.get("authId", None),
             }
             wfm_response = put_item(wfm_customer_table, wfm_item)
             response_list.append(wfm_response)

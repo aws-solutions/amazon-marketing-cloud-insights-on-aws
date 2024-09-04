@@ -23,20 +23,12 @@ class GlueScriptsUploader(Construct):
                  scope: Construct,
                  id: str,
                  solution_buckets,
-                 dataset,
-                 glue_prefix,
-                 glue_script_path,
-                 glue_script_local_file_path,
-
                  ) -> None:
         super().__init__(scope, id)
 
         self._solution_buckets = solution_buckets
-        self._glue_prefix = glue_prefix
+        self._glue_prefix = "data_lake/sdlf_heavy_transform/glue"
         self._resource_prefix = Aws.STACK_NAME
-        self._dataset = dataset
-        self._glue_script_path = glue_script_path
-        self._glue_script_local_file_path = glue_script_local_file_path
 
         self._create_iam_policy_for_custom_resource_lambda()
         self._create_sdlf_heavy_transform_glue_script_lambda()
@@ -79,7 +71,7 @@ class GlueScriptsUploader(Construct):
             GLUE_CUSTOM_RESOURCE_PATH / "glue" / "lambdas" /"sync_sdlf_heavy_transform_glue_script.py",
             "event_handler",
             runtime=lambda_.Runtime.PYTHON_3_11,
-            function_name=f"{self._resource_prefix}-upload-{self._dataset}-glue-script",
+            function_name=f"{self._resource_prefix}-upload-glue-scripts",
             description="Place the glue script of sdlf heavy transform to the S3 artifacts bucket",
             timeout=Duration.minutes(5),
             memory_size=256,
@@ -97,7 +89,7 @@ class GlueScriptsUploader(Construct):
         SolutionsLambdaFunctionAlarm(
             self,
             id="sdlf-heavy-transform-glue-script-lambda-alarm",
-            alarm_name=f"{self._resource_prefix}-upload-{self._dataset}-glue-script-lambda-alarm",
+            alarm_name=f"{self._resource_prefix}-upload-glue-scripts-lambda-alarm",
             lambda_function=self._sdlf_heavy_transform_glue_script_lambda
         )
 
@@ -117,9 +109,7 @@ class GlueScriptsUploader(Construct):
             service_token=self._sdlf_heavy_transform_glue_script_lambda.function_arn,
             properties={
                 "artifacts_bucket_name": self._solution_buckets.artifacts_bucket.bucket_name,
-                "artifacts_object_key": self._glue_script_path,
-                "glue_script_file": self._glue_script_local_file_path,
-                "amc_dataset_version": "3.0.0",
+                "artifacts_key_prefix": f"{self._glue_prefix}/",
                 "custom_resource_uuid": str(uuid.uuid4())  # random uuid to trigger redeploy on stack update
             },
         )

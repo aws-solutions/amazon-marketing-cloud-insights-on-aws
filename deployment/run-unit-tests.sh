@@ -54,7 +54,7 @@ else
   echo "[Env] Using active virtual environment for tests"
   echo "------------------------------------------------------------------------------"
   python_version=$(python --version 2>&1 | cut -d ' ' -f 2)
-  if [[ "$python_version" != "11"* ]]; then
+  if [[ "$python_version" != 3.11.* ]]; then
     echo "You are using Python version $python_version. Python version 11 is required."
     echo "Update your environment or run tests again without an active environment."
     exit 1

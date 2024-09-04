@@ -4,21 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # PURPOSE:
-#  Run functional tests
-#
-# USAGE:
-#  ./run-test.sh [-h] [-v] --stack-name {STACK_NAME} --region {REGION} --profile {PROFILE} --email {EMAIL}
-#    STACK_NAME name of the Cloudformation stack where the solution is running.
-#    REGION needs to be in a format like us-east-1
-#    PROFILE the profile that you have setup in ~/.aws/credentials
-#      that you want to use for AWS CLI commands.
-#    EMAIL an valid email to receive notifications from the solution
-#
-#    The following options are available:
-#
-#     -h | --help       Print usage
-#     -v | --verbose    Print script debug info
-#
+#  Run functional tests for deploying the solution
 ###############################################################################
 
 usage() {
@@ -35,9 +21,6 @@ Available options:
 --profile         AWS profile for CLI commands
 --email           Email to receive notifications
 --role-arn        Cloudformation role to assume when deploying
---extras          Append more commands to pytest run (optional)
---test-file-name  Run individual test file (optional) e.g --test-file-name test_stack_deploy/test_create_stack.py or test_stack_deploy/test_create_stack.py::test_create_stack for single test.
---in-venv         Run test in an existing virtual environment [--in-venv 1] (optional)
 EOF
   exit 1
 }
@@ -75,10 +58,6 @@ parse_params() {
       role_arn="${2}"
       shift
       ;;
-    --in-venv)
-      in_venv="${2}"
-      shift
-      ;;
     *) break ;;
     esac
     shift
@@ -108,7 +87,6 @@ msg "- Region: ${region}"
 msg "- Profile: ${profile}"
 msg "- Email: ${email}"
 msg "- Role arn: ${role_arn}"
-msg "- in_venv: ${in_venv}"
 
 echo ""
 sleep 3
@@ -137,7 +115,7 @@ export ROLE_ARN=$role_arn
 
 # Create a temporary Python virtualenv if no venv is active.
 source $functional_tests_dir/helper/create_venv.sh
-create_venv in_venv
+create_venv
 
 echo "Remove build folder from solution helper package"
 rm -r "$source_dir/cdk_solution_helper_py/helpers_common/build"
@@ -162,7 +140,7 @@ echo "TEST STACK SYNTHESIZE & DEPLOY"
 echo "-----------------------------------------"
 
 cd $deployment_dir
-version_code="v3.0.0"
+version_code="v3.1.0"
 build-s3-cdk-dist deploy \
   --source-bucket-name $template_bucket_name \
   --solution-name amcinsights \

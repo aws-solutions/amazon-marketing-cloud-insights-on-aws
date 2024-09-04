@@ -40,6 +40,7 @@ def format_payload(customer_details):
         "customerName": customer_details['customer_name'],
         "createSnsTopic": "false",
         "snsTopicArn": sns_topic,
+        "authId": customer_details.get("auth_id", None),
 
         # Customer info for AMC instance
         "amcOrangeAwsAccount":customer_details["amc"]["aws_orange_account_id"],

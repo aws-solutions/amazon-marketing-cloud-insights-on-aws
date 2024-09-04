@@ -17,7 +17,7 @@ from aws_cdk import Aws, CfnCondition, Aspects, Fn, CfnOutput
 from aws_lambda_layers.aws_solutions.layer import SolutionsLayer
 from amc_insights.condition_aspect import ConditionAspect
 from aws_solutions.cdk.aws_lambda.layers.aws_lambda_powertools import PowertoolsLayer
-from aws_solutions.cdk.cfn_nag import add_cfn_nag_suppressions, CfnNagSuppression, CfnNagSuppressAll
+from aws_solutions.cdk.cfn_nag import add_cfn_nag_suppressions, CfnNagSuppression, CfnNagSuppressAll, add_cfn_guard_suppressions
 from amc_insights.custom_resource.tenant_provisioning_service.amc_template_uploader import AMCTemplateUploader
 
 AWS_RESOURCE_ACCOUNT_KEY = "aws:ResourceAccount"
@@ -136,7 +136,7 @@ class TenantProvisioningService(Construct):
                 )
             ),
             layer_version_name=f"{self._resource_prefix}-metrics-layer",
-            compatible_runtimes=[Runtime.PYTHON_3_9],
+            compatible_runtimes=[Runtime.PYTHON_3_11],
         )
 
     ######################################
@@ -154,7 +154,7 @@ class TenantProvisioningService(Construct):
             description="Triggers the AMC Instance Setup state machine",
             timeout=cdk.Duration.seconds(30),
             memory_size=128,
-            runtime=Runtime.PYTHON_3_9,
+            runtime=Runtime.PYTHON_3_11,
             architecture=Architecture.ARM_64,
             environment={
                 "SOLUTION_ID": self.node.try_get_context("SOLUTION_ID"),
@@ -437,7 +437,7 @@ class TenantProvisioningService(Construct):
             description="Creates/Updates TPS customer stacks",
             timeout=cdk.Duration.minutes(10),
             memory_size=256,
-            runtime=Runtime.PYTHON_3_9,
+            runtime=Runtime.PYTHON_3_11,
             architecture=Architecture.ARM_64,
             role=add_amc_instance_role,
             environment={
@@ -470,7 +470,7 @@ class TenantProvisioningService(Construct):
             description="Checks if TPS customer stacks have finished (success/failure)",
             timeout=cdk.Duration.minutes(15),
             memory_size=256,
-            runtime=Runtime.PYTHON_3_9,
+            runtime=Runtime.PYTHON_3_11,
             architecture=Architecture.ARM_64,
             role=add_amc_instance_role,
             environment={
@@ -492,7 +492,7 @@ class TenantProvisioningService(Construct):
             description="Adds TPS customer information to SDLF and WFM DynamoDB tables",
             timeout=cdk.Duration.minutes(10),
             memory_size=512,
-            runtime=Runtime.PYTHON_3_9,
+            runtime=Runtime.PYTHON_3_11,
             architecture=Architecture.ARM_64,
             environment={
                 "SOLUTION_ID": self.node.try_get_context("SOLUTION_ID"),
@@ -551,7 +551,9 @@ class TenantProvisioningService(Construct):
                     actions=[
                         "s3:GetBucketLogging",
                         "s3:PutBucketLogging",
-                        "s3:PutBucketPolicy"
+                        "s3:PutBucketPolicy",
+                        "s3:PutBucketNotification",
+                        "s3:GetBucketNotification"
                     ],
                     resources=[
                         "arn:aws:s3:::amc*",
@@ -572,6 +574,11 @@ class TenantProvisioningService(Construct):
             amc_instance_post_deploy_metadata_policy.node.default_child,
             LOGGING_SUPRESSION
         )
+        add_cfn_guard_suppressions(
+            resource=amc_instance_post_deploy_metadata_policy.node.default_child,
+            suppressions=["IAM_POLICY_NON_COMPLIANT_ARN"]
+        )
+        # Suppression Reason: S3 Bucket arns do not follow arn:partition:service:region:account-id format
 
         definition = {
             "Comment": "Simple pseudo flow",

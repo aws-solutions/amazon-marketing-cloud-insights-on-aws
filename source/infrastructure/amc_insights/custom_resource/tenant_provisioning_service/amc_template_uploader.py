@@ -74,7 +74,7 @@ class AMCTemplateUploader(Construct):
             "SyncAMCInitializeTemplate",
             AMC_INSIGHTS_CUSTOM_RESOURCE_PATH / "tenant_provisioning_service" / "lambdas" /"sync_amc_initialize_template.py",
             "event_handler",
-            runtime=Runtime.PYTHON_3_9,
+            runtime=Runtime.PYTHON_3_11,
             description="Lambda function for custom resource for placing the AMC initialize template to the S3 artifacts bucket",
             timeout=Duration.minutes(5),
             memory_size=256,

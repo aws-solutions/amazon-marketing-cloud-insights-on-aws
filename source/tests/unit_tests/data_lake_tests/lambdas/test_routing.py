@@ -1,9 +1,17 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+# ###############################################################################
+# PURPOSE:
+#   * Unit test for data_lake/pipelines/lambdas/routing/handler.py
+# USAGE:
+#   ./run-unit-tests.sh --test-file-name data_lake_tests/lambdas/test_routing.py
+
+import sys
 import pytest
 import boto3
-from unittest.mock import Mock
+from datetime import datetime
+from unittest.mock import Mock, MagicMock
 from moto import mock_aws
 from aws_solutions.core.helpers import get_service_client
 
@@ -16,6 +24,12 @@ def side_effect(*args, **kwargs):
             }
         }
     return {}
+
+
+@pytest.fixture(autouse=True)
+def _mocked_cloudwatch_metrics(monkeypatch):
+    mocked_cloudwatch_metrics = MagicMock()
+    sys.modules['cloudwatch_metrics'] = mocked_cloudwatch_metrics
 
 
 @pytest.fixture()
@@ -176,3 +190,67 @@ def test_put_item(_mock_dynamodb_resource):
     table = _mock_dynamodb_resource.Table("octagon-ObjectMetadata-dev-prefix")
     put_item(table, message, "id")
     assert table.item_count == 1
+
+
+def test_parse_s3_event_cloudtrail():
+    s3_event = {
+        'detail-type': 'AWS API Call via CloudTrail',
+        'detail': {
+            'requestParameters': {
+                'bucketName': 'XXXXXXXXX',
+                'key': 'path/to/file.txt'
+            }
+        },
+        'time': '2023-04-25T12:34:56Z'
+    }
+    expected_output = {
+        'bucket': 'XXXXXXXXX',
+        'key': 'path/to/file.txt',
+        'timestamp': int(round(datetime.utcnow().timestamp() * 1000, 0)),
+        'last_modified_date': '2023-04-25T12:34:56Z+00:00'
+    }
+    
+    from data_lake.pipelines.lambdas.routing.handler import parse_s3_event
+    try:
+        assert parse_s3_event(s3_event)["bucket"] == expected_output
+    except AssertionError:
+        for expected_key in ["bucket", "key", "last_modified_date"]:
+            assert parse_s3_event(s3_event)[expected_key] == expected_output[expected_key]
+
+def test_parse_s3_event_eventbridge():
+    s3_event = {
+        'detail-type': 'Object Created',
+        'detail': {
+            'bucket': {
+                'name': 'another-bucket'
+            },
+            'object': {
+                'key': 'folder/file.csv'
+            }
+        },
+        'time': '2023-04-25T18:25:43Z'
+    }
+    expected_output = {
+        'bucket': 'another-bucket', 
+        'key': 'folder/file.csv',
+        'timestamp': int(round(datetime.utcnow().timestamp() * 1000, 0)),
+        'last_modified_date': '2023-04-25T18:25:43Z+00:00'
+    }
+    
+    from data_lake.pipelines.lambdas.routing.handler import parse_s3_event
+
+    try:
+        assert parse_s3_event(s3_event)["bucket"] == expected_output
+    except AssertionError:
+        for expected_key in ["bucket", "key", "last_modified_date"]:
+            assert parse_s3_event(s3_event)[expected_key] == expected_output[expected_key]
+    
+    
+def test_parse_s3_event_invalid():
+    s3_event = {
+        'detail-type': 'SomeInvalidType'
+    }
+    
+    from data_lake.pipelines.lambdas.routing.handler import parse_s3_event
+    with pytest.raises(KeyError):
+        parse_s3_event(s3_event)

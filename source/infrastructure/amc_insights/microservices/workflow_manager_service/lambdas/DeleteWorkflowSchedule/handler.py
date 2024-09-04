@@ -5,17 +5,13 @@ import boto3
 import os
 from aws_lambda_powertools import Logger
 
-from wfm_utilities import wfm_utilities
 from cloudwatch_metrics import metrics
 
 RULE_PREFIX = os.environ['RULE_PREFIX']
 METRICS_NAMESPACE = os.environ['METRICS_NAMESPACE']
 RESOURCE_PREFIX = os.environ['RESOURCE_PREFIX']
 
-# Create a logger instance and pass that to the common utils lambda_function layer class so it can log errors
 logger = Logger(service="Workflow Management Service", level="INFO")
-
-Utils = wfm_utilities.Utils(logger)
 
 
 def events_get_targets_for_rule(rule_name: str, client):

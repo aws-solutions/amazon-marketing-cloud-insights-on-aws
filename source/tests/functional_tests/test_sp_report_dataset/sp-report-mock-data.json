@@ -1,0 +1,87 @@
+{
+  "reportSpecification": {
+    "reportType": "GET_BRAND_ANALYTICS_MARKET_BASKET_REPORT",
+    "reportOptions": {
+      "reportPeriod": "WEEK"
+    },
+    "dataStartTime": "2023-12-31",
+    "dataEndTime": "2024-01-06",
+    "marketplaceIds": [
+      "ATVPDKIKX0DER"
+    ]
+  },
+  "dataByAsin": [
+    {
+      "startDate": "2023-12-31",
+      "endDate": "2024-01-06",
+      "asin": "B000VT0FRI",
+      "purchasedWithAsin": "B07ZLFPXHC",
+      "purchasedWithRank": 1,
+      "combinationPct": 0.2105
+    },
+    {
+      "startDate": "2023-12-31",
+      "endDate": "2024-01-06",
+      "asin": "B000VT0FRI",
+      "purchasedWithAsin": "B000NOGKN4",
+      "purchasedWithRank": 2,
+      "combinationPct": 0.1053
+    },
+    {
+      "startDate": "2023-12-31",
+      "endDate": "2024-01-06",
+      "asin": "B000VT0FRI",
+      "purchasedWithAsin": "B000P717MI",
+      "purchasedWithRank": 3,
+      "combinationPct": 0.1053
+    },
+    {
+      "startDate": "2023-12-31",
+      "endDate": "2024-01-06",
+      "asin": "1559910763",
+      "purchasedWithAsin": "1559910097",
+      "purchasedWithRank": 1,
+      "combinationPct": 0.3571
+    },
+    {
+      "startDate": "2023-12-31",
+      "endDate": "2024-01-06",
+      "asin": "1559910763",
+      "purchasedWithAsin": "1559910224",
+      "purchasedWithRank": 2,
+      "combinationPct": 0.1429
+    },
+    {
+      "startDate": "2023-12-31",
+      "endDate": "2024-01-06",
+      "asin": "1559910763",
+      "purchasedWithAsin": "1559910852",
+      "purchasedWithRank": 3,
+      "combinationPct": 0.1429
+    },
+    {
+      "startDate": "2023-12-31",
+      "endDate": "2024-01-06",
+      "asin": "1405206306",
+      "purchasedWithAsin": "B006CSPZK4",
+      "purchasedWithRank": 1,
+      "combinationPct": 1.0
+    },
+    {
+      "startDate": "2023-12-31",
+      "endDate": "2024-01-06",
+      "asin": "1405206306",
+      "purchasedWithAsin": "B07VL6LH91",
+      "purchasedWithRank": 2,
+      "combinationPct": 1.0
+    },
+    {
+      "startDate": "2023-12-31",
+      "endDate": "2024-01-06",
+      "asin": "1405206306",
+      "purchasedWithAsin": "B0CJ3B8RPS",
+      "purchasedWithRank": 3,
+      "combinationPct": 1.0
+    }
+  ]
+}

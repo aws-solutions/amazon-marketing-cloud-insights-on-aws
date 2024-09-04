@@ -55,25 +55,14 @@ class SDLFDatasetConstruct(Construct):
         self._stage_b_transform = dataset_parameters.stage_b_transform
         self._solution_buckets = solution_buckets
         self._sdlf_pipeline_stage_b = sdlf_pipeline_stage_b
+        self._description = dataset_parameters.description
 
         self._resource_prefix = Aws.STACK_NAME
 
         # glue script location in S3 bucket
         self._glue_prefix = "data_lake/sdlf_heavy_transform/glue"
         self._glue_script_path = f"{self._glue_prefix}/{self._team}/{self.dataset}/main.py"
-
-        # glue script location
-        self._glue_script_local_file_path = f"sdlf_heavy_transform/{self._team}/{self.dataset}/main.py"
-
-        GlueScriptsUploader(
-            self,
-            "SyncGlueScripts",
-            self._solution_buckets,
-            self.dataset,
-            self._glue_prefix,
-            self._glue_script_path,
-            self._glue_script_local_file_path
-        )
+        self._shared_modules_path = f"{self._glue_prefix}/shared/utilities.py"
 
         self._register_octagon_configs()
 
@@ -89,7 +78,7 @@ class SDLFDatasetConstruct(Construct):
 
         self._props = {
             "id": "sdlf-dataset",
-            "description": "sdlf dataset",
+            "description": self._description,
             "name": f"{self._team}-{self.dataset}",
             "type": "octagon_dataset",
             "pipeline": self._pipeline,
@@ -246,6 +235,7 @@ class SDLFDatasetConstruct(Construct):
                 "--enable-metrics": "",
                 "--additional-python-modules": "awswrangler>=2.4.0,aws-lambda-powertools>=2.15.0",
                 "--enable-job-insights": "true",
+                "--extra-py-files": f"s3://{self._solution_buckets.artifacts_bucket.bucket_name}/{self._shared_modules_path}",
                 "--SOLUTION_ID": self.node.try_get_context("SOLUTION_ID"),
                 "--SOLUTION_VERSION": self.node.try_get_context("SOLUTION_VERSION"),
                 "--METRICS_NAMESPACE": self.node.try_get_context("METRICS_NAMESPACE"),

@@ -4,7 +4,9 @@
 from amc_insights.condition_aspect import ConditionAspect
 from constructs import Construct
 from aws_cdk.aws_iam import Effect, PolicyStatement, Policy
-from aws_cdk import Aspects
+from aws_cdk import Aspects, Aws
+import aws_cdk.aws_events as events
+import aws_cdk.aws_events_targets as targets
 
 class IntegrationConstruct(Construct):
     def __init__(
@@ -14,6 +16,7 @@ class IntegrationConstruct(Construct):
             tenant_provisioning_resources,
             foundations_resources,
             insights_pipeline_resources,
+            report_bucket,
             creating_resources_condition
     ) -> None:
         super().__init__(scope, id)
@@ -21,6 +24,7 @@ class IntegrationConstruct(Construct):
         self._tenant_provisioning_resources = tenant_provisioning_resources
         self._foundations_resources = foundations_resources
         self._insights_pipeline_resources = insights_pipeline_resources
+        self._report_bucket = report_bucket
 
         # Apply condition to resources in Construct
         Aspects.of(self).add(ConditionAspect(self, "ConditionAspect", creating_resources_condition))
@@ -81,3 +85,36 @@ class IntegrationConstruct(Construct):
             ]
         )
         dynamodb_policy.attach_to_role(self._tenant_provisioning_resources.amc_instance_post_deploy_metadata.role)
+        
+        # create event to trigger data lake when files land in reporting bucket
+        events.Rule(
+            self,
+            id="reports-bucket-event-capture",
+            rule_name=f"{Aws.STACK_NAME}-reports-bucket-event-capture",
+            description="Capture data landing in the reports bucket",
+            event_pattern=events.EventPattern(
+                source=["aws.s3"],
+                detail={
+                    "eventSource": [
+                        "s3.amazonaws.com"
+                    ],
+                    "eventName": [
+                            "CopyObject",
+                            "CompleteMultipartUpload",
+                            "PutObject",
+                            "DeleteObject"
+                        ],
+                    "requestParameters": {
+                        "bucketName": [
+                            self._report_bucket.bucket_name
+                        ],
+                    }
+                },
+            ),
+            targets=[targets.LambdaFunction(self._insights_pipeline_resources.routing_function)]
+        )
+        self._insights_pipeline_resources.routing_function.node.add_dependency(self._report_bucket)
+
+        # grant stage-a processing lambda permission to access reporting bucket
+        self._report_bucket.grant_read_write(self._insights_pipeline_resources.stage_a_transform._process_lambda)
+        self._report_bucket.encryption_key.grant_decrypt(self._insights_pipeline_resources.stage_a_transform._process_lambda)

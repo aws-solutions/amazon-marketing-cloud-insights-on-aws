@@ -5,23 +5,10 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # PURPOSE:
-#  Run functional tests depending on configuration deployed
+#  Run functional tests for amc wfm scheduling
 #
 # PRELIMINARY:
 #  Deploy the solution before running this script
-#
-# USAGE:
-#  ./run-test.sh [-h] [-v] [-n] --stack-name {STACK_NAME} --region {REGION} --profile {PROFILE}
-#    STACK_NAME name of the Cloudformation stack where the solution is running.
-#    REGION needs to be in a format like us-east-1
-#    PROFILE the profile that you have setup in ~/.aws/credentials
-#      that you want to use for AWS CLI commands.
-#
-#    The following options are available:
-#
-#     -h | --help       Print usage
-#     -v | --verbose    Print script debug info
-#
 ###############################################################################
 
 #########################

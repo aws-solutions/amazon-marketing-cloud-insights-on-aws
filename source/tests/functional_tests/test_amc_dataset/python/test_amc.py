@@ -13,7 +13,7 @@ import subprocess
 
 STACK_NAME = os.environ['STACK']
 REGION = os.environ['REGION']
-PROFILE = os.environ['DEFAULT_PROFILE']
+PROFILE = os.environ['STACK_PROFILE']
 CUSTOMER_ID = os.environ['CUSTOMER_ID']
 AMC_INSTANCE_ID = os.environ['AMC_INSTANCE_ID']
 AMAZON_ADS_ADVERTISER_ID = os.environ['AMAZON_ADS_ADVERTISER_ID']
@@ -21,9 +21,7 @@ AMAZON_ADS_MARKETPLACE_ID = os.environ['AMAZON_ADS_MARKETPLACE_ID']
 
 
 def get_cross_account_profile():
-    check = os.environ['TEST_CROSS_ACCOUNT']
-    if check == "Yes":
-        return os.environ['BUCKET_PROFILE']
+    return os.environ.get("BUCKET_PROFILE", None)
 
 
 def get_dataset_config():

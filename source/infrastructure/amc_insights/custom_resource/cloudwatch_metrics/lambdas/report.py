@@ -37,6 +37,64 @@ logger.addHandler(handler)
 
 METRICS_ENDPOINT = 'https://metrics.awssolutionsbuilder.com/generic'
 
+# These metrics return numerical values that can be summed directly
+METRICS_TO_SUM = [
+    # Lambda Metrics
+    'AddAMCInstance',
+    'AddAMCInstanceCheck',
+    'AddAMCInstancePostDeployMetadata',
+    'CancelWorkflowExecution',
+    'CheckWorkflowExecutionStatus',
+    'CreateWorkflow',
+    'CreateWorkflowExecution',
+    'CreateWorkflowSchedule',
+    'DatalakeRouting',
+    'DeleteWorkflow',
+    'DeleteWorkflowSchedule',
+    'GetExecutionSummary',
+    'GetWorkflow',
+    'SdlfHeavyTransformCheckJob',
+    'SdlfHeavyTransformError',
+    'SdlfHeavyTransformPostupdateMetadata',
+    'SdlfHeavyTransformProcessObject',
+    'SdlfHeavyTransformRedrive',
+    'SdlfHeavyTransformRouting',
+    'UpdateWorkflow',
+    'ScheduleAdsReport',
+    'ScheduleSpReport',
+    # State machine metrics:
+    'InvokeTPSInitializeSM',
+    'InvokeWorkflowExecutionSM',
+    'InvokeWorkflowSM',
+    'InvokeAdsReportSM',
+    'SdlfHeavyTransformRedriveSM',
+    'SdlfHeavyTransformRoutingSM',
+    'SdlfLightTransformSM',
+    # Glue Job metrics:
+    'SdlfHeavyTransformJob-num_files',
+    'SdlfHeavyTransformJob-bytes_read',
+    'SdlfHeavyTransformJob-bytes_written',
+    'SdlfHeavyTransformJob-num_records',
+    'SdlfHeavyTransformJob-run_count',
+    # AmazonAdsReport
+    'AdsCheckReportStatus',
+    'AdsDownloadReport',
+    'AdsGetProfiles',
+    'InvokeAdsReportSM',
+    'RequestSponsoredAdsReport',
+    # SellingPartnerReport
+    'SellersPartnerGetReportDocument',
+    'InvokeSpReportSM',
+    'SellerPartnerCreateReport',
+    'SellersPartnerDownloadReport',
+    'SellersPartnerGetReportStatus'
+]
+
+# These metrics return nested values that we need to unpack before summing
+NESTED_METRICS = [
+    'AmazonAdsReporting-report_type',
+    'SellingPartnerReporting-report_type',
+]
 
 def event_handler(event, context):
     """
@@ -51,6 +109,33 @@ def event_handler(event, context):
     else:
         logger.info("Anonymized data collection is opted out, no operational metrics to report")
 
+def update_nested_metrics(data, metric_name, datapoints):
+    for datapoint in datapoints:
+        for key, _ in datapoint.items():
+            if key != 'Sum':
+                update_metric_sum(data, metric_name, key, datapoint['Sum'])
+
+def update_metric_sum(data, metric_name, key, sum_value):
+    if key in data["Data"].get(metric_name, {}):
+        data["Data"][metric_name][key] += sum_value
+    else:
+        data["Data"].setdefault(metric_name, {})[key] = sum_value
+
+def handle_metrics(data, metric_name, datapoints):
+    if metric_name in NESTED_METRICS:
+        update_nested_metrics(data, metric_name, datapoints)
+    else:
+        if len(datapoints) > 1:
+            logging.warning("Got " + str(
+                len(datapoints)) + " datapoints but only expected one datapoint since period is one day and start/end time spans one day.")
+        total = 0
+        for datapoint in datapoints:
+            # There should only be one datapoint since period is one day and
+            # start/end time spans one day, but if there is more than one datapoint
+            # then sum them together:
+            total += datapoint["Sum"]
+        # Add the sum to the reporting payload:
+        data["Data"][metric_name] = total
 
 def send_metrics():
     """
@@ -72,44 +157,9 @@ def send_metrics():
         "TimeStamp": str(datetime.now()),
         "Data": {}
     }
-    # Define the list of metrics to use for counting state machine launches:
-    metrics_to_sum = [
-        'AddAMCInstance',
-        'AddAMCInstanceCheck',
-        'AddAMCInstancePostDeployMetadata',
-        'CancelWorkflowExecution',
-        'CheckWorkflowExecutionStatus',
-        'CreateWorkflow',
-        'CreateWorkflowExecution',
-        'CreateWorkflowSchedule',
-        'DatalakeRouting',
-        'DeleteWorkflow',
-        'DeleteWorkflowSchedule',
-        'GetExecutionSummary',
-        'GetWorkflow',
-        'SdlfHeavyTransformCheckJob',
-        'SdlfHeavyTransformError',
-        'SdlfHeavyTransformPostupdateMetadata',
-        'SdlfHeavyTransformProcessObject',
-        'SdlfHeavyTransformRedrive',
-        'SdlfHeavyTransformRouting',
-        'UpdateWorkflow',
-        # State machine metrics:
-        'InvokeTPSInitializeSM',
-        'InvokeWorkflowExecutionSM',
-        'InvokeWorkflowSM',
-        'SdlfHeavyTransformRedriveSM',
-        'SdlfHeavyTransformRoutingSM',
-        'SdlfLightTransformSM',
-        # Glue Job metrics:
-        'SdlfHeavyTransformJob-num_files',
-        'SdlfHeavyTransformJob-bytes_read',
-        'SdlfHeavyTransformJob-bytes_written',
-        'SdlfHeavyTransformJob-num_records',
-        'SdlfHeavyTransformJob-run_count'
-    ]
-    for metric_name in metrics_to_sum:
-        # Sum all values for the metric over the past 24 hours:
+    
+    all_metrics = NESTED_METRICS + METRICS_TO_SUM
+    for metric_name in all_metrics:
         response = cloudwatch_client.get_metric_statistics(
             Namespace=METRICS_NAMESPACE,
             MetricName=metric_name,
@@ -119,26 +169,17 @@ def send_metrics():
             Statistics=['Sum'],
             Dimensions=[
                 {'Name': 'stack-name', 'Value': os.environ['STACK_NAME']}
-            ])
+            ]
+        )
         datapoints = response.get('Datapoints', [])
-        # Add datapoints to the reporting payload:
+        
         if datapoints:
-            if len(datapoints) > 1:
-                logging.warning("Got " + str(
-                    len(datapoints)) + " datapoints but only expected one datapoint since period is one day and start/end time spans one day.")
-            total = 0
-            for datapoint in datapoints:
-                # There should only be one datapoint since period is one day and
-                # start/end time spans one day, but if there is more than one datapoint
-                # then sum them together:
-                total += datapoint["Sum"]
-            # Add the sum to the reporting payload:
-            data["Data"][metric_name] = total
-    # Send metric data:
+            handle_metrics(data, metric_name, datapoints)
+
     if data["Data"]:
         logging.info("Reporting the following data:")
         logging.info(json.dumps(data))
         response = requests.post(METRICS_ENDPOINT, json=data, timeout=5)
-        print(f"Response status code = {response.status_code}")
+        logger.info(f"Response status code = {response.status_code}")
     else:
         logging.info("No data to report.")

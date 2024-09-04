@@ -75,20 +75,24 @@ def on_delete(event, _) -> Dict[str, str]:
     props = get_props(event)
     table_name = get_table_name(props)
     physical_id = event["PhysicalResourceId"]
-    if table_name in [OCTAGON_PIPELINE_TABLE_NAME, OCTAGON_DATASET_TABLE_NAME]:
-        try:
-            delete_item(table_name=table_name, key={"name": props["name"]})
-        except Exception as err:
-            logger.error(err)
-            raise err
-        logger.info(f"Delete resource {physical_id} with props {props}")
+    # we ignore the default list of datasets otherwise they are deleted after updating
+    if props["name"] not in ("adtech-sp_report", "adtech-amc", "adtech-ads_report"):
+        if table_name in [OCTAGON_PIPELINE_TABLE_NAME, OCTAGON_DATASET_TABLE_NAME]:
+            try:
+                delete_item(table_name=table_name, key={"name": props["name"]})
+            except Exception as err:
+                logger.error(err)
+                raise err
+            logger.info(f"Delete resource {physical_id} with props {props}")
+        else:
+            try:
+                delete_item(table_name=table_name, key={"id": props["id"]})
+            except Exception as err:
+                logger.error(err)
+                raise err
+            logger.info(f"Delete resource {physical_id} with props {props}")
     else:
-        try:
-            delete_item(table_name=table_name, key={"id": props["id"]})
-        except Exception as err:
-            logger.error(err)
-            raise err
-        logger.info(f"Delete resource {physical_id} with props {props}")
+        logger.info(f"Skip deletion of {props['name']} record, update in place")
     return {"PhysicalResourceId": physical_id}
 
 

@@ -16,6 +16,10 @@ from data_lake.datasets.sdlf_dataset import SDLFDatasetConstruct
 
 
 class LakeformationSettings(Construct):
+    '''
+    This custom resource is for removing Lake Formation admins on stack deletion.
+    This is necessary for handling the following issue: https://github.com/aws/aws-cdk/issues/19492
+    '''
     def __init__(
             self,
             scope,
@@ -38,13 +42,6 @@ class LakeformationSettings(Construct):
             role_list=self._glue_role_arn_list,
             condition=datalake_condition,
             name="dataset_cr"
-        )
-        self._create_lakeformation_settings_custom_resource(
-            role_list=[
-                self._pmn_resources.sagemaker_role.role_arn
-            ],
-            condition=microservice_condition,
-            name="pmn_cr"
         )
 
     ######################################
@@ -85,7 +82,7 @@ class LakeformationSettings(Construct):
             "LakeformationSettingsLambda",
             AMC_INSIGHTS_CUSTOM_RESOURCE_PATH / "lakeformation_settings" / "lambdas" / "remove_data_lake_admin.py",
             "event_handler",
-            runtime=Runtime.PYTHON_3_9,
+            runtime=Runtime.PYTHON_3_11,
             description="Lambda function for custom resource for creating and placing the user iam resources in the S3 artifacts bucket",
             timeout=Duration.minutes(5),
             memory_size=256,

@@ -201,7 +201,7 @@ class FoundationsConstruct(Construct):
             memory_size=256,
             description="Registers Datasets, Pipelines and Stages into their respective DynamoDB tables",
             timeout=cdk.Duration.minutes(1),
-            runtime=Runtime.PYTHON_3_9,
+            runtime=Runtime.PYTHON_3_11,
             architecture=lambda_.Architecture.ARM_64,
             environment={
                 "SOLUTION_ID": self.node.try_get_context("SOLUTION_ID"),
@@ -353,7 +353,8 @@ class FoundationsConstruct(Construct):
         self.wrangler_layer = LayerVersion.from_layer_version_arn(
             self,
             "data-wrangler-layer",
-            f"arn:aws:lambda:{Aws.REGION}:336392948345:layer:AWSSDKPandas-Python39-Arm64:6"
+            # https://aws-sdk-pandas.readthedocs.io/en/3.9.0/layers.html
+            f"arn:aws:lambda:{Aws.REGION}:336392948345:layer:AWSSDKPandas-Python311-Arm64:16"
         )
 
         self.powertools_layer = PowertoolsLayer.get_or_create(self)
@@ -363,7 +364,7 @@ class FoundationsConstruct(Construct):
             "data-lake-layer",
             layer_version_name="data-lake-library",
             code=Code.from_asset(os.path.join(f"{Path(__file__).parents[1]}", "lambda_layers/data_lake_library")),
-            compatible_runtimes=[Runtime.PYTHON_3_9],
+            compatible_runtimes=[Runtime.PYTHON_3_11],
             description=f"{self._resource_prefix} Data Lake Library",
             license="Apache-2.0",
         )

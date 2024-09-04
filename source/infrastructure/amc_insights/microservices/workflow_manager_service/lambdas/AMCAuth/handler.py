@@ -4,22 +4,22 @@
 import os
 import json
 from aws_lambda_powertools import Logger
+
 # Import the common lambda_function layer functions
-from wfm_amc_api_interface import wfm_amc_api_interface
-from wfm_utilities import wfm_utilities
 from cloudwatch_metrics import metrics
+from microservice_shared.secrets import SecretsHelper
+from microservice_shared.api import ApiHelper
 
 
-# Create a logger instance and pass that to the common utils lambda_function layer class so it can log errors
-logger = Logger(service="Workflow Management Service", level="INFO")
-
-utils = wfm_utilities.Utils(logger)
 METRICS_NAMESPACE = os.environ['METRICS_NAMESPACE']
 RESOURCE_PREFIX = os.environ['RESOURCE_PREFIX']
 AMC_SECRETS_MANAGER = os.environ['AMC_SECRETS_MANAGER']
 
+logger = Logger(service="Workflow Management Service", level="INFO")
+api_helper = ApiHelper()
 
-def handler(event, context):
+
+def handler(event, _):
     """
     Retrieve access and refresh tokens from AMC using client id, client secret, and authorization code stored in Secrets Manager.
     """
@@ -27,9 +27,11 @@ def handler(event, context):
     metrics.Metrics(METRICS_NAMESPACE, RESOURCE_PREFIX, logger).put_metrics_count_value_1(
         metric_name="AMCAuth")
     
-    event['EXECUTION_RUNNING_LAMBDA_NAME'] = context.function_name
+    # if multi-account credentials are set up, customers will pass in "auth_id" to identify which credentials to be used
+    auth_id = event.get("auth_id", None)
+    secrets_helper = SecretsHelper(AMC_SECRETS_MANAGER, auth_id=auth_id)
 
-    secrets = wfm_amc_api_interface.get_secret(AMC_SECRETS_MANAGER)
+    secrets = secrets_helper.get_secret()
 
     if not (secrets.get("client_id") and secrets.get("client_secret") and secrets.get("authorization_code")):
         raise ValueError(
@@ -48,7 +50,7 @@ def handler(event, context):
     }
 
     encoded_code_payload = json.dumps(auth_payload)
-    response = wfm_amc_api_interface.send_request(
+    response = api_helper.send_request(
         http_method="POST",
         request_url="https://api.amazon.com/auth/o2/token",
         headers=None,
@@ -73,7 +75,7 @@ def handler(event, context):
 
     # Update authorization tokens in Secrets Manager.
     try:
-        wfm_amc_api_interface.update_secret(AMC_SECRETS_MANAGER, secret_value)
+        secrets_helper.update_secret(secret_value)
     except Exception as ex:
         logger.exception(f"Cannot update authorization tokens in Secret Manager {AMC_SECRETS_MANAGER}. Reason: {ex}")
 

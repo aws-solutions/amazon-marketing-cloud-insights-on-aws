@@ -46,6 +46,9 @@ class BuildEnvironment:
         self.source_dir = os.path.normpath(
             os.path.join(self.template_dir, os.pardir, "source")
         )
+        self.images_dir = os.path.normpath(
+            os.path.join(self.template_dir, os.pardir, "images")
+        )
         self.infrastructure_dir = os.path.join(self.source_dir, "infrastructure")
         self.open_source_dir = os.path.join(self.template_dir, "open-source")
         self.github_dir = os.path.normpath(
@@ -249,18 +252,20 @@ def source_code_package(ctx, ignore, solution_name):
         "CHANGELOG.md",
         ".gitignore",
         "solution-manifest.yaml",
-        "IAM_POLICY_INSTALL.json"
+        "IAM_POLICY_INSTALL.json",
+        "SECURITY.md"
     ]
 
-    # copy source directory
+    # copy required full directories
     try:
         copytree(
             env.source_dir, os.path.join(env.open_source_dir, "source"), ignore=ignored
         )
         copytree(env.github_dir, os.path.join(env.open_source_dir, ".github"))
+        copytree(env.images_dir, os.path.join(env.open_source_dir, "images"))
     except FileNotFoundError:
         raise click.ClickException(
-            "The solution requires a `source` folder and a `.github` folder"
+            "The solution requires a `source` folder, `.github` folder, and `images` folder"
         )
 
     # copy all required files
@@ -274,17 +279,19 @@ def source_code_package(ctx, ignore, solution_name):
                 f"The solution is missing the required file {name}"
             )
 
-    # copy the required run-unit-tests.sh
+    # copy the required deployment directory files
     (Path(env.open_source_dir) / "deployment").mkdir()
-    try:
-        shutil.copyfile(
-            Path(env.template_dir) / "run-unit-tests.sh",
-            Path(env.open_source_dir) / "deployment" / "run-unit-tests.sh",
-        )
-    except FileNotFoundError:
-        raise click.ClickException(
-            f"The solution is missing deployment/run-unit-tests.sh"
-        )
+    deployment_files = ["run-unit-tests.sh", "venv_check.py", "build-s3-dist.sh"]
+    for file in deployment_files:
+        try:
+            shutil.copyfile(
+                Path(env.template_dir) / file,
+                Path(env.open_source_dir) / "deployment" / file,
+            )
+        except FileNotFoundError:
+            raise click.ClickException(
+                f"The solution is missing deployment/{file}"
+            )
 
     shutil.make_archive(
         base_name=os.path.join(env.template_dir, solution_name),

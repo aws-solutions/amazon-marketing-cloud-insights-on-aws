@@ -8,8 +8,14 @@
 ###############################################################################
 
 create_venv() {
-  in_venv="$1"
-  if [[ ${in_venv:-0} -ne 1 ]]; then
+  # Get the directory where this script is located
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+  # Check if the virtual environment already exists
+  venv_check_status=$(python3 "$script_dir/venv_check.py"; echo $?)
+
+  # If the virtual environment doesn't exist, create it
+  if [[ "$venv_check_status" == 1 ]]; then
     echo "------------------------------------------------------------------------------"
     echo "Creating a temporary Python virtualenv for this run test script"
     echo "------------------------------------------------------------------------------"

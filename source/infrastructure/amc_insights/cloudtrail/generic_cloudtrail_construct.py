@@ -11,6 +11,10 @@ from amc_insights.microservices.workflow_manager_service import WorkFlowManagerS
 from amc_insights.microservices.tenant_provisioning_service import TenantProvisioningService
 from data_lake.foundations.foundations_construct import FoundationsConstruct
 from data_lake.pipelines.sdlf_pipeline import SDLFPipelineConstruct
+from reporting_microservices.reporting_shared import ReportingShared
+from reporting_microservices.selling_partner_reporting.selling_partner_reporting import SellingPartnerReporting
+from reporting_microservices.amazon_ads_reporting.amazon_ads_reporting import AmazonAdsReporting
+
 
 
 class GenericCloudTrailConstruct(Construct):
@@ -30,7 +34,10 @@ class GenericCloudTrailConstruct(Construct):
         self.foundation_resources: Union[FoundationsConstruct, None] = None
         self.tps_resources: Union[TenantProvisioningService, None] = None
         self.wfm_resources: Union[WorkFlowManagerService, None] = None
-
+        self.reporting_shared_resources: Union[ReportingShared, None] = None
+        self.amazon_ads_reporting: Union[AmazonAdsReporting, None] = None
+        self.selling_partner_reporting: Union[SellingPartnerReporting, None] = None
+       
         self.solution_buckets_resources: SolutionBuckets = constructs_to_tail.get("solution_buckets_resources")
         self.microservice = constructs_to_tail.get("microservice")
         self.datalake = constructs_to_tail.get("datalake")
@@ -59,6 +66,8 @@ class GenericCloudTrailConstruct(Construct):
             buckets.append(self.foundation_resources.raw_bucket)
             buckets.append(self.foundation_resources.stage_bucket)
             buckets.append(self.foundation_resources.athena_bucket)
+        if self.reporting_shared_resources:
+            buckets.append(self.reporting_shared_resources.bucket)
         return buckets
 
     def get_lambda_handlers(self):
@@ -76,12 +85,20 @@ class GenericCloudTrailConstruct(Construct):
                 handlers.extend(sdlf_pipeline.stage_a_transform.lambda_functions)
                 handlers.extend(sdlf_pipeline.stage_b_transform.lambda_functions)
 
+        if self.amazon_ads_reporting:
+            handlers.extend(self.amazon_ads_reporting.lambda_function_list)
+        if self.selling_partner_reporting:
+            handlers.extend(self.selling_partner_reporting.lambda_function_list)
+
         return handlers
 
     def get_microservice_resources(self, microservice):
         if microservice:
+            self.reporting_shared_resources: ReportingShared = self.microservice.rsr
             self.wfm_resources: WorkFlowManagerService = self.microservice.wfm
             self.tps_resources: TenantProvisioningService = self.microservice.tps
+            self.amazon_ads_reporting: AmazonAdsReporting = self.microservice.aar
+            self.selling_partner_reporting: SellingPartnerReporting = self.microservice.spr
 
     def get_datalake_resources(self, datalake):
         if datalake:
