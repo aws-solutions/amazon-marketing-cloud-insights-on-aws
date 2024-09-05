@@ -9,7 +9,7 @@ from test_amc import AMCTest, get_aws_account_from_profile, get_cross_region, ge
 
 STACK_NAME = os.environ['STACK']
 REGION = os.environ['REGION']
-PROFILE = os.environ['DEFAULT_PROFILE']
+PROFILE = os.environ['STACK_PROFILE']
 CUSTOMER_ID = os.environ['CUSTOMER_ID']
 AMC_INSTANCE_ID = os.environ['AMC_INSTANCE_ID']
 AMAZON_ADS_ADVERTISER_ID = os.environ['AMAZON_ADS_ADVERTISER_ID']

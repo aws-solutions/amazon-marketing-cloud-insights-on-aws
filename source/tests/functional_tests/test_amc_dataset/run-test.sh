@@ -5,23 +5,10 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # PURPOSE:
-#  Run functional tests depending on configuration deployed
+#  Run functional tests for the amc dataset
 #
 # PRELIMINARY:
 #  Deploy the solution before running this script
-#
-# USAGE:
-#  ./run-test.sh [-h] [-v] [-n] --stack-name {STACK_NAME} --region {REGION} --profile {PROFILE}
-#    STACK_NAME name of the Cloudformation stack where the solution is running.
-#    REGION needs to be in a format like us-east-1
-#    PROFILE the profile that you have setup in ~/.aws/credentials
-#      that you want to use for AWS CLI commands.
-#
-#    The following options are available:
-#
-#     -h | --help       Print usage
-#     -v | --verbose    Print script debug info
-#
 ###############################################################################
 
 #########################
@@ -38,7 +25,6 @@ Available options:
 -h, --help           Print this help and exit (optional)
 -v, --verbose        Print script debug info (optional)
 --no-clean           Do not clean tests after running (optional)
---in-venv            Run tests in a virtual environment (optional)
 --bucket-profile     If testing cross-account, the AWS profile to deploy the amc instance bucket (optional)
 --skip-cross-region  Skip cross-region tests (optional)
 --stack-name         Name of the Cloudformation stack where the solution is running
@@ -62,17 +48,6 @@ cleanup() {
   else
     python3 python/cleanup_tests.py
   fi
-  # Deactivate and remove the temporary python virtualenv used to run this script
-  # if [[ $in_venv ]]; then
-  #   echo "Run tests in virtualenv, no deactivate"
-  # else
-  #   deactivate
-  #   rm -rf "$VENV"
-  #   rm -rf __pycache__
-  #   echo "------------------------------------------------------------------------------"
-  #   echo "Clean up complete"
-  #   echo "------------------------------------------------------------------------------"
-  # fi
 }
 
 msg() {
@@ -138,8 +113,16 @@ msg "- Stack name: ${stack_name}"
 msg "- Region: ${region}"
 msg "- Profile: ${profile}"
 
+# Get reference for all important folders
+current_dir="$PWD"
+source_dir="$(
+  cd $current_dir/../../../../source
+  pwd -P
+)"
+functional_tests_dir="$source_dir/tests/functional_tests"
+
 export REGION=$region
-export DEFAULT_PROFILE=$profile
+export STACK_PROFILE=$profile
 export STACK=$stack_name
 export CUSTOMER_ID=$(LC_ALL=C tr -dc a-z </dev/urandom | head -c 8)
 export AMC_INSTANCE_ID="amc$(LC_ALL=C tr -dc a-z </dev/urandom | head -c 8)"
@@ -148,9 +131,6 @@ export AMAZON_ADS_MARKETPLACE_ID=$(LC_ALL=C tr -dc A-Z </dev/urandom | head -c 8
 if [[ $bucket_profile ]]; then
   echo "--bucket-profile provided, running cross account test"
   export BUCKET_PROFILE=$bucket_profile
-  export TEST_CROSS_ACCOUNT="Yes"
-else
-  export TEST_CROSS_ACCOUNT="No"
 fi
 if [[ $skip_cross_region ]]; then
     echo "--skip-cross-region provided, skipping cross region test"
@@ -168,42 +148,28 @@ if [[ ! -x "$(command -v aws)" ]]; then
   exit 1
 fi
 
-# if [[ $in_venv ]]; then
-#   echo "Using active python environment"
-# else
-#   echo "---------------------------------------------------------------"
-#   echo "Creating a temporary Python virtualenv for this test amc script"
-#   echo "---------------------------------------------------------------"
-#   VENV=$(mktemp -d) && echo "$VENV"
-#   command -v python3 >/dev/null
-#   if [ $? -ne 0 ]; then
-#     echo "ERROR: install Python3 before running this script"
-#     exit 1
-#   fi
-#   python3 -m venv "$VENV"
-#   source "$VENV"/bin/activate
-#   pip3 install wheel
-#   pip3 install --quiet -r requirements-test.txt
-# fi
+# Create a temporary Python virtualenv if no venv is active.
+source $functional_tests_dir/helper/create_venv.sh
+create_venv
 
 echo "------------------------------------------------------------------------------"
 echo "Checking deployed stack resources"
 echo "------------------------------------------------------------------------------"
 
 # check that amc dataset has been deployed in this stack
-export TEST_AMC_DATASET=$(aws cloudformation describe-stacks --stack-name "$stack_name" --region "$region" --profile $DEFAULT_PROFILE --query "Stacks[].Parameters[?ParameterKey=='ShouldDeployDataLake'].ParameterValue" --output text)
+export TEST_AMC_DATASET=$(aws cloudformation describe-stacks --stack-name "$stack_name" --region "$region" --profile "$profile" --query "Stacks[].Parameters[?ParameterKey=='ShouldDeployDataLake'].ParameterValue" --output text)
 if [[ "$TEST_AMC_DATASET" == "Yes" ]]; then
-  export STAGE_BUCKET=$(aws cloudformation describe-stack-resource --stack-name "$STACK" --region "$region" --profile $DEFAULT_PROFILE --logical-resource-id foundationsstagebucket7D53680B --query StackResourceDetail.PhysicalResourceId --output text)
-  export SDLF_CUSTOMER_TABLE=$(aws cloudformation describe-stack-resource --stack-name "$STACK" --region "$region" --profile $DEFAULT_PROFILE --logical-resource-id foundationssdlfCustomerConfig45371CE6 --query StackResourceDetail.PhysicalResourceId --output text)
+  export STAGE_BUCKET=$(aws cloudformation describe-stack-resource --stack-name "$STACK" --region "$region" --profile "$profile" --logical-resource-id foundationsstagebucket7D53680B --query StackResourceDetail.PhysicalResourceId --output text)
+  export SDLF_CUSTOMER_TABLE=$(aws cloudformation describe-stack-resource --stack-name "$STACK" --region "$region" --profile "$profile" --logical-resource-id foundationssdlfCustomerConfig45371CE6 --query StackResourceDetail.PhysicalResourceId --output text)
 else
     echo "AMC Dataset has not been deployed. There is nothing to test"
     cleanup_and_die
 fi
 
 # grab important resources from the stack that will be used in testing/cleanup
-export WFM_CUSTOMER_TABLE=$(aws cloudformation describe-stack-resource --stack-name "$STACK" --region "$region" --profile $DEFAULT_PROFILE --logical-resource-id wfmwfmCustomerConfig2F0732CB --query StackResourceDetail.PhysicalResourceId --output text)
-export TPS_CUSTOMER_TABLE=$(aws cloudformation describe-stack-resource --stack-name "$STACK" --region "$region" --profile $DEFAULT_PROFILE --logical-resource-id tpstpsCustomerConfigDCD9A325 --query StackResourceDetail.PhysicalResourceId --output text)
-export CLOUDTRAIL_NAME=$(aws cloudformation describe-stack-resource --stack-name "$STACK" --region "$region" --profile $DEFAULT_PROFILE --logical-resource-id cloudtrailFullApplicationCloudTrailS3AndLambda833794F2 --query StackResourceDetail.PhysicalResourceId --output text)
+export WFM_CUSTOMER_TABLE=$(aws cloudformation describe-stack-resource --stack-name "$STACK" --region "$region" --profile "$profile" --logical-resource-id wfmwfmCustomerConfig2F0732CB --query StackResourceDetail.PhysicalResourceId --output text)
+export TPS_CUSTOMER_TABLE=$(aws cloudformation describe-stack-resource --stack-name "$STACK" --region "$region" --profile "$profile" --logical-resource-id tpstpsCustomerConfigDCD9A325 --query StackResourceDetail.PhysicalResourceId --output text)
+export CLOUDTRAIL_NAME=$(aws cloudformation describe-stack-resource --stack-name "$STACK" --region "$region" --profile "$profile" --logical-resource-id cloudtrailFullApplicationCloudTrailS3AndLambda833794F2 --query StackResourceDetail.PhysicalResourceId --output text)
 
 echo "------------------------------------------------------------------------------"
 echo "Running pytest"

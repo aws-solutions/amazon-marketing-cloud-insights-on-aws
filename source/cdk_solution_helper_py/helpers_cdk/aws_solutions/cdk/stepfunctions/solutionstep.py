@@ -119,17 +119,17 @@ class SolutionStep(Construct):
             if libraries and any(not l.exists() for l in libraries):
                 raise ValueError(f"libraries provided, but do not exist at {libraries}")
 
-            function = kwargs.pop("function")
+            _function = kwargs.pop("function")
             kwargs["layers"] = kwargs.get("layers", [])
             kwargs["tracing"] = Tracing.ACTIVE
             kwargs["timeout"] = Duration.seconds(15)
-            kwargs["runtime"] = Runtime("python3.9", RuntimeFamily.PYTHON)
+            kwargs["runtime"] = Runtime("python3.11", RuntimeFamily.PYTHON)
 
             super().__init__(
                 scope,
                 construct_id,
                 entrypoint,
-                function,
+                _function,
                 libraries=libraries,
                 **kwargs,
             )

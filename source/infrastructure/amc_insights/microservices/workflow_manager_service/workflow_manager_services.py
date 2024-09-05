@@ -35,6 +35,7 @@ class WorkFlowManagerService(Construct):
             team: str,
             email_parameter,
             creating_resources_condition: CfnCondition,
+            lambda_layers
     ) -> None:
         super().__init__(scope, id)
 
@@ -118,17 +119,17 @@ class WorkFlowManagerService(Construct):
             encryption_key=self.amc_secrets_manager_key,
             removal_policy=RemovalPolicy.DESTROY,
             secret_object_value={
-                "client_id": SecretValue.plain_text(""),
-                "client_secret": SecretValue.plain_text(""),
-                "authorization_code": SecretValue.plain_text(""),
-                "refresh_token": SecretValue.plain_text(""),
-                "access_token": SecretValue.plain_text("")
+                "client_id": SecretValue.unsafe_plain_text(""),
+                "client_secret": SecretValue.unsafe_plain_text(""),
+                "authorization_code": SecretValue.unsafe_plain_text(""),
+                "refresh_token": SecretValue.unsafe_plain_text(""),
+                "access_token": SecretValue.unsafe_plain_text("")
             },
         )
         CfnOutput(
             self,
             "AMCSecrets",
-            description="Use this link to access the Secrets Manager",
+            description="Use this link to access Secrets Manager for the Amazon Ads API",
             value=f"https://{Aws.REGION}.console.aws.amazon.com/secretsmanager/secret?name={self.amc_secrets_manager.secret_name}&region={Aws.REGION}",
             condition=creating_resources_condition,
         )
@@ -270,7 +271,9 @@ class WorkFlowManagerService(Construct):
         #           Lambda Layers            #
         ######################################
 
-        self.powertools_layer = self.powertools_layer = PowertoolsLayer.get_or_create(self)
+        self.powertools_layer = PowertoolsLayer.get_or_create(self)
+        self.metrics_layer = lambda_layers.metrics_layer
+        self.microservice_layer = lambda_layers.microservice_layer
 
         self.wfm_layer = LayerVersion(
             self,
@@ -282,19 +285,7 @@ class WorkFlowManagerService(Construct):
                 )
             ),
             layer_version_name=f"{self._resource_prefix}-wfm-layer",
-            compatible_runtimes=[_lambda.Runtime.PYTHON_3_9],
-        )
-        self.metrics_layer = LayerVersion(
-            self,
-            "metrics-layer",
-            code=_lambda.Code.from_asset(
-                path=os.path.join(
-                    f"{Path(__file__).parents[3]}",
-                    "aws_lambda_layers/metrics_layer/"
-                )
-            ),
-            layer_version_name=f"{self._resource_prefix}-metrics-layer",
-            compatible_runtimes=[_lambda.Runtime.PYTHON_3_9],
+            compatible_runtimes=[_lambda.Runtime.PYTHON_3_11],
         )
 
         ######################################
@@ -311,7 +302,7 @@ class WorkFlowManagerService(Construct):
                 )
             ),
             description="Invokes the Workflow state machine",
-            runtime=_lambda.Runtime.PYTHON_3_9,
+            runtime=_lambda.Runtime.PYTHON_3_11,
             architecture=_lambda.Architecture.ARM_64,
             handler="handler.handler",  # NOSONAR
             timeout=cdk.Duration.minutes(1),
@@ -326,6 +317,7 @@ class WorkFlowManagerService(Construct):
                 self.powertools_layer,
                 self.wfm_layer,
                 self.metrics_layer,
+                self.microservice_layer,
                 SolutionsLayer.get_or_create(self)
             ],
         )
@@ -341,7 +333,7 @@ class WorkFlowManagerService(Construct):
                 )
             ),
             description="Invokes the Workflow Executions state machine",
-            runtime=_lambda.Runtime.PYTHON_3_9,
+            runtime=_lambda.Runtime.PYTHON_3_11,
             architecture=_lambda.Architecture.ARM_64,
             handler="handler.handler",
             timeout=cdk.Duration.minutes(1),
@@ -357,6 +349,7 @@ class WorkFlowManagerService(Construct):
                 self.powertools_layer,
                 self.wfm_layer,
                 self.metrics_layer,
+                self.microservice_layer,
                 SolutionsLayer.get_or_create(self)
             ]
         )
@@ -383,7 +376,7 @@ class WorkFlowManagerService(Construct):
                 )
             ),
             description="Checks the status of workflow executions",
-            runtime=_lambda.Runtime.PYTHON_3_9,
+            runtime=_lambda.Runtime.PYTHON_3_11,
             architecture=_lambda.Architecture.ARM_64,
             handler="handler.handler",
             timeout=cdk.Duration.minutes(1),
@@ -400,6 +393,7 @@ class WorkFlowManagerService(Construct):
                 self.powertools_layer,
                 self.wfm_layer,
                 self.metrics_layer,
+                self.microservice_layer,
                 SolutionsLayer.get_or_create(self)
             ]
         )
@@ -422,7 +416,7 @@ class WorkFlowManagerService(Construct):
                 )
             ),
             description="Gets a summary of workflow executions",
-            runtime=_lambda.Runtime.PYTHON_3_9,
+            runtime=_lambda.Runtime.PYTHON_3_11,
             architecture=_lambda.Architecture.ARM_64,
             handler="handler.handler",
             timeout=cdk.Duration.minutes(1),
@@ -438,6 +432,7 @@ class WorkFlowManagerService(Construct):
                 self.powertools_layer,
                 self.wfm_layer,
                 self.metrics_layer,
+                self.microservice_layer,
                 SolutionsLayer.get_or_create(self)
             ]
         )
@@ -453,7 +448,7 @@ class WorkFlowManagerService(Construct):
                 )
             ),
             description="Creates a new workflow execution",
-            runtime=_lambda.Runtime.PYTHON_3_9,
+            runtime=_lambda.Runtime.PYTHON_3_11,
             architecture=_lambda.Architecture.ARM_64,
             handler="handler.handler",
             timeout=cdk.Duration.seconds(600),
@@ -470,6 +465,7 @@ class WorkFlowManagerService(Construct):
                 self.powertools_layer,
                 self.wfm_layer,
                 self.metrics_layer,
+                self.microservice_layer,
                 SolutionsLayer.get_or_create(self)
             ]
         )
@@ -490,7 +486,7 @@ class WorkFlowManagerService(Construct):
                 )
             ),
             description="Cancels a running workflow execution",
-            runtime=_lambda.Runtime.PYTHON_3_9,
+            runtime=_lambda.Runtime.PYTHON_3_11,
             architecture=_lambda.Architecture.ARM_64,
             handler="handler.handler",
             timeout=cdk.Duration.minutes(1),
@@ -507,6 +503,7 @@ class WorkFlowManagerService(Construct):
                 self.powertools_layer,
                 self.wfm_layer,
                 self.metrics_layer,
+                self.microservice_layer,
                 SolutionsLayer.get_or_create(self)
             ]
         )
@@ -527,7 +524,7 @@ class WorkFlowManagerService(Construct):
                 )
             ),
             description="Creates a new workflow",
-            runtime=_lambda.Runtime.PYTHON_3_9,
+            runtime=_lambda.Runtime.PYTHON_3_11,
             architecture=_lambda.Architecture.ARM_64,
             handler="handler.handler",
             timeout=cdk.Duration.minutes(1),
@@ -544,6 +541,7 @@ class WorkFlowManagerService(Construct):
                 self.powertools_layer,
                 self.wfm_layer,
                 self.metrics_layer,
+                self.microservice_layer,
                 SolutionsLayer.get_or_create(self)
             ]
         )
@@ -563,7 +561,7 @@ class WorkFlowManagerService(Construct):
                 )
             ),
             description="Updates an existing workflow",
-            runtime=_lambda.Runtime.PYTHON_3_9,
+            runtime=_lambda.Runtime.PYTHON_3_11,
             architecture=_lambda.Architecture.ARM_64,
             handler="handler.handler",
             timeout=cdk.Duration.minutes(1),
@@ -580,6 +578,7 @@ class WorkFlowManagerService(Construct):
                 self.powertools_layer,
                 self.wfm_layer,
                 self.metrics_layer,
+                self.microservice_layer,
                 SolutionsLayer.get_or_create(self)
             ]
         )
@@ -600,7 +599,7 @@ class WorkFlowManagerService(Construct):
                 )
             ),
             description="Gets a workflow definition",
-            runtime=_lambda.Runtime.PYTHON_3_9,
+            runtime=_lambda.Runtime.PYTHON_3_11,
             architecture=_lambda.Architecture.ARM_64,
             handler="handler.handler",
             timeout=cdk.Duration.minutes(1),
@@ -617,6 +616,7 @@ class WorkFlowManagerService(Construct):
                 self.powertools_layer,
                 self.wfm_layer,
                 self.metrics_layer,
+                self.microservice_layer,
                 SolutionsLayer.get_or_create(self)
             ]
         )
@@ -637,7 +637,7 @@ class WorkFlowManagerService(Construct):
                 )
             ),
             description="Deletes a workflow",
-            runtime=_lambda.Runtime.PYTHON_3_9,
+            runtime=_lambda.Runtime.PYTHON_3_11,
             architecture=_lambda.Architecture.ARM_64,
             handler="handler.handler",
             timeout=cdk.Duration.minutes(1),
@@ -654,6 +654,7 @@ class WorkFlowManagerService(Construct):
                 self.powertools_layer,
                 self.wfm_layer,
                 self.metrics_layer,
+                self.microservice_layer,
                 SolutionsLayer.get_or_create(self)
             ]
         )
@@ -674,7 +675,7 @@ class WorkFlowManagerService(Construct):
                 )
             ),
             description="Creates a workflow schedule",
-            runtime=_lambda.Runtime.PYTHON_3_9,
+            runtime=_lambda.Runtime.PYTHON_3_11,
             architecture=_lambda.Architecture.ARM_64,
             handler="handler.handler",
             timeout=cdk.Duration.minutes(1),
@@ -690,6 +691,7 @@ class WorkFlowManagerService(Construct):
                 self.powertools_layer,
                 self.wfm_layer,
                 self.metrics_layer,
+                self.microservice_layer,
                 SolutionsLayer.get_or_create(self)
             ]
         )
@@ -704,7 +706,7 @@ class WorkFlowManagerService(Construct):
                 )
             ),
             description="Deletes a workflow schedule",
-            runtime=_lambda.Runtime.PYTHON_3_9,
+            runtime=_lambda.Runtime.PYTHON_3_11,
             architecture=_lambda.Architecture.ARM_64,
             handler="handler.handler",
             timeout=cdk.Duration.minutes(1),
@@ -719,6 +721,7 @@ class WorkFlowManagerService(Construct):
                 self.powertools_layer,
                 self.wfm_layer,
                 self.metrics_layer,
+                self.microservice_layer,
                 SolutionsLayer.get_or_create(self)
             ]
         )
@@ -733,7 +736,7 @@ class WorkFlowManagerService(Construct):
                 )
             ),
             description="Runs AMC OAuth Flow",
-            runtime=_lambda.Runtime.PYTHON_3_9,
+            runtime=_lambda.Runtime.PYTHON_3_11,
             architecture=_lambda.Architecture.ARM_64,
             handler="handler.handler",
             timeout=cdk.Duration.minutes(1),
@@ -749,6 +752,7 @@ class WorkFlowManagerService(Construct):
                 self.powertools_layer,
                 self.wfm_layer,
                 self.metrics_layer,
+                self.microservice_layer,
                 SolutionsLayer.get_or_create(self)
             ]
         )
@@ -798,7 +802,7 @@ class WorkFlowManagerService(Construct):
             "secretsmanager:PutSecretValue",
             "secretsmanager:GetSecretValue"
         ]
-        secrets_manager_lambda_iam_policy = Policy(
+        self.secrets_manager_lambda_iam_policy = Policy(
             self, "SecretsManagerLambdaIamPolicy",
             statements=[
                 PolicyStatement(
@@ -819,7 +823,7 @@ class WorkFlowManagerService(Construct):
                                      self.lambda_amc_auth]
         for function in self.lambda_function_list:
             cloudwatch_metrics_policy.attach_to_role(function.role)
-            secrets_manager_lambda_iam_policy.attach_to_role(function.role)
+            self.secrets_manager_lambda_iam_policy.attach_to_role(function.role)
             self.amc_secrets_manager.encryption_key.grant_encrypt_decrypt(function.role)
 
         ##################################
@@ -942,16 +946,8 @@ class WorkFlowManagerService(Construct):
         ).otherwise(task_create_execution)
         task_get_execution_summary.next(choice_evaluate_summary)
 
-        result_selector_items = {
-            "customerId.$": "$.Item.customerId.S",
-            "outputSNSTopicArn.$": "$.Item.outputSNSTopicArn.S",
-            "amcInstanceId.$": "$.Item.amcInstanceId.S",
-            "amcAmazonAdsAdvertiserId.$": "$.Item.amcAmazonAdsAdvertiserId.S",
-            "amcAmazonAdsMarketplaceId.$": "$.Item.amcAmazonAdsMarketplaceId.S",
-        }
 
         # State machine begins
-
         task_execution_get_customer_config = tasks.DynamoGetItem(
             self,
             'GetCustomerConfigRecord',
@@ -962,9 +958,9 @@ class WorkFlowManagerService(Construct):
                     )
                 )
             },
-            result_selector=result_selector_items,
             table=self.dynamodb_customer_config_table,
             result_path="$.customerConfig")
+        
         wait_initial_wait_step.next(task_execution_get_customer_config)
         task_execution_get_customer_config.next(choice_determine_execution_request_type)
 
@@ -1003,7 +999,7 @@ class WorkFlowManagerService(Construct):
         task_set_execution_email_body = tasks.EvaluateExpression(
             self,
             'Set Execution Notification Body',
-            expression="`${$.messageSubject}\n\nCustomer ID: ${$.customerId}\nRequest Type: ${$.executionRequest.requestType}\nWorkflow Execution Name: ${$.workflowExecutionName}\nResponse Status: ${$.responseStatus}\nResponse Message: ${$.responseMessage}\n\n\nWorkflow Execution Request:\n${$.snsMessage.default}`",
+            expression="`${$.messageSubject}\n\nCustomer Id: ${$.customerId}\nRequest Type: ${$.executionRequest.requestType}\nWorkflow Execution Name: ${$.workflowExecutionName}\nResponse Status: ${$.responseStatus}\nResponse Message: ${$.responseMessage}\n\n--\nWorkflow Execution Request:\n\n${$.snsMessage.default}`",
             runtime=_lambda.Runtime.NODEJS_18_X,
             result_path="$.snsMessage.email"
         ).next(publish_execution_sns)
@@ -1079,7 +1075,7 @@ class WorkFlowManagerService(Construct):
             self,
             "WFMExecutionsSM",
             state_machine_name=f"{self._resource_prefix}-wfm-executions",
-            definition=wait_initial_wait_step,
+            definition_body=stepfunctions.DefinitionBody.from_chainable(wait_initial_wait_step),
             logs=stepfunctions.LogOptions(level=stepfunctions.LogLevel.ALL, destination=_executions_sm_log_group)
         )
         self.kms_key.grant_encrypt_decrypt(self.statemachine_workflow_executions_sm.role)
@@ -1130,13 +1126,6 @@ class WorkFlowManagerService(Construct):
             "Evaluate Workflow Status Response"
         )
 
-        result_selector_items = {
-            "customerId.$": "$.Item.customerId.S",
-            "outputSNSTopicArn.$": "$.Item.outputSNSTopicArn.S",
-            "amcInstanceId.$": "$.Item.amcInstanceId.S",
-            "amcAmazonAdsAdvertiserId.$": "$.Item.amcAmazonAdsAdvertiserId.S",
-            "amcAmazonAdsMarketplaceId.$": "$.Item.amcAmazonAdsMarketplaceId.S",
-        }
         task_get_customer_config = tasks.DynamoGetItem(
             self,
             'GetCustomerConfig',
@@ -1144,7 +1133,6 @@ class WorkFlowManagerService(Construct):
                 stepfunctions.JsonPath.string_at('$.customerId')
             )
             },
-            result_selector=result_selector_items,
             table=self.dynamodb_customer_config_table,
             result_path="$.customerConfig"
         )
@@ -1197,7 +1185,7 @@ class WorkFlowManagerService(Construct):
         task_set_workflow_email_body = tasks.EvaluateExpression(
             self,
             'Set Workflow Notification Body',
-            expression="`${$.messageSubject}\n\nCustomer ID: ${$.customerId}\nRequest Type: ${$.workflowRequest.requestType}\nWorkflow ID: ${$.workflowRequest.workflowId}\nResponse Status: ${$.responseStatus}\nResponse Message: ${$.responseMessage}\n\n\nWorkflow Request:\n${$.snsMessage.default}`",
+            expression="`${$.messageSubject}\n\nCustomer Id: ${$.customerId}\nRequest Type: ${$.workflowRequest.requestType}\nWorkflow Id: ${$.workflowRequest.workflowId}\nResponse Status: ${$.responseStatus}\nResponse Message: ${$.responseMessage}\n\n--\nWorkflow Request:\n\n${$.snsMessage.default}`",
             runtime=_lambda.Runtime.NODEJS_18_X,
             result_path="$.snsMessage.email").next(
             publish_workflow_sns
@@ -1286,7 +1274,7 @@ class WorkFlowManagerService(Construct):
             self,
             "WFMWorkflowsSM",
             state_machine_name=f"{self._resource_prefix}-wfm-workflows",
-            definition=task_get_customer_config,
+            definition_body=stepfunctions.DefinitionBody.from_chainable(task_get_customer_config),
             logs=stepfunctions.LogOptions(level=stepfunctions.LogLevel.ALL, destination=_workflows_sm_log_group)
         )
 

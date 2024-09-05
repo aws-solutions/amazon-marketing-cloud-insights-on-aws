@@ -64,7 +64,7 @@ class OperationalMetrics(Construct):
             "CreateOperationalMetrics",
             AMC_INSIGHTS_CUSTOM_RESOURCE_PATH / "anonymized_operational_metrics" / "lambdas" / "stack_uuid.py",
             "event_handler",
-            runtime=lambda_.Runtime.PYTHON_3_9,
+            runtime=lambda_.Runtime.PYTHON_3_11,
             description="Lambda function for custom resource for the creating anonymized operational metrics uuid in Secrets Manager",
             timeout=Duration.minutes(5),
             memory_size=256,

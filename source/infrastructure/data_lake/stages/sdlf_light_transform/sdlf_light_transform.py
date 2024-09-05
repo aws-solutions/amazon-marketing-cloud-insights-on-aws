@@ -160,7 +160,7 @@ class SDLFLightTransform(Construct):
             timeout=Duration.minutes(1),
             memory_size=256,
             architecture=lambda_.Architecture.ARM_64,
-            runtime=Runtime.PYTHON_3_9,
+            runtime=Runtime.PYTHON_3_11,
         )
 
         # Grant permission to record metrics in cloudwatch.
@@ -203,7 +203,7 @@ class SDLFLightTransform(Construct):
             timeout=Duration.minutes(1),
             memory_size=256,
             architecture=lambda_.Architecture.ARM_64,
-            runtime=Runtime.PYTHON_3_9,
+            runtime=Runtime.PYTHON_3_11,
         )
 
         SolutionsLambdaFunctionAlarm(
@@ -231,7 +231,7 @@ class SDLFLightTransform(Construct):
             timeout=Duration.minutes(1),
             memory_size=256,
             architecture=lambda_.Architecture.ARM_64,
-            runtime=Runtime.PYTHON_3_9,
+            runtime=Runtime.PYTHON_3_11,
         )
 
         SolutionsLambdaFunctionAlarm(
@@ -258,7 +258,7 @@ class SDLFLightTransform(Construct):
             timeout=Duration.minutes(1),
             memory_size=256,
             architecture=lambda_.Architecture.ARM_64,
-            runtime=Runtime.PYTHON_3_9,
+            runtime=Runtime.PYTHON_3_11,
         )
 
         SolutionsLambdaFunctionAlarm(
@@ -284,7 +284,7 @@ class SDLFLightTransform(Construct):
             timeout=Duration.minutes(1),
             memory_size=256,
             architecture=lambda_.Architecture.ARM_64,
-            runtime=Runtime.PYTHON_3_9,
+            runtime=Runtime.PYTHON_3_11,
         )
 
         SolutionsLambdaFunctionAlarm(
@@ -310,7 +310,7 @@ class SDLFLightTransform(Construct):
             description="Executes lights transform in Data Lake StageA",
             timeout=Duration.minutes(15),
             memory_size=1536,
-            runtime=Runtime.PYTHON_3_9,
+            runtime=Runtime.PYTHON_3_11,
             architecture=lambda_.Architecture.ARM_64,
         )
 
@@ -341,7 +341,7 @@ class SDLFLightTransform(Construct):
             "metrics-layer",
             code=Code.from_asset(path=os.path.join(f"{Path(__file__).parents[3]}", "aws_lambda_layers/metrics_layer/")),
             layer_version_name=f"{self.resource_prefix}-metrics-layer",
-            compatible_runtimes=[Runtime.PYTHON_3_9],
+            compatible_runtimes=[Runtime.PYTHON_3_11],
         )
 
         data_lake_layer_version = LayerVersion.from_layer_version_arn(

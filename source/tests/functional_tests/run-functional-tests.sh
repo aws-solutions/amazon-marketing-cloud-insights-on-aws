@@ -4,25 +4,29 @@
 # SPDX-License-Identifier: Apache-2.0
 #
 # PURPOSE:
-#  Run functional tests depending on configuration deployed
+#  Run all functional tests depending on configuration deployed
 ###############################################################################
 
 usage() {
   msg "$msg"
   cat <<EOF
-Usage: $(basename "${BASH_SOURCE[0]}") [-h] [-v] --profile PROFILE --stack-name STACK_NAME --region REGION --email EMAIL
+Usage: $(basename "${BASH_SOURCE[0]}") --profile PROFILE --stack-name STACK_NAME --region REGION --email EMAIL
 
-Available options:
-
--h, --help           Print this help and exit (optional)
--v, --verbose        Print script debug info (optional)
---no-clean           Do not clean tests after running (optional)
---in-venv            Run test in an existing virtual environment [--in-venv 1] (optional)
---stack-name         Name of the Cloudformation stack where the solution is running (optional)
---bucket-profile     If testing cross-account, the AWS profile to deploy the amc instance bucket (optional)
+All Tests:
 --region             AWS Region, formatted like us-east-1
 --profile            AWS profile for CLI commands
 --email              Email to receive notifications
+--stack-name         Name of the Cloudformation stack where the solution is running (optional)
+
+Test Stack Deploy & Install Policy:
+No optional arguments. These tests will only run if --stack-name is not used
+
+Test Extended Dataset:
+--role-arn           Cloudformation role to assume when updating the stack (optional)
+
+Test AMC Dataset:
+--no-clean           Do not clean tests after running (optional)
+--bucket-profile     If testing cross-account, the AWS profile to deploy the amc instance bucket (optional)
 --skip-cross-region  Skip cross-region tests (optional)
 EOF
   exit 1
@@ -64,10 +68,6 @@ parse_params() {
       bucket_profile="${2}"
       shift
       ;;
-    --in-venv)
-      in_venv="${2}"
-      shift
-      ;;
     *) break ;;
     esac
     shift
@@ -93,12 +93,15 @@ msg "- Stack name: ${stack_name}"
 msg "- Region: ${region}"
 msg "- Profile: ${profile}"
 msg "- Email: ${email}"
-msg "- in_venv: ${in_venv}"
 
 role_arn=0
 current_dir="$PWD"
 source_dir="$(
   cd $current_dir/../../../source
+  pwd -P
+)"
+deployment_dir="$(
+  cd $current_dir/../../../deployment
   pwd -P
 )"
 
@@ -110,7 +113,7 @@ fi
 
 # Create a temporary Python virtualenv if no venv is active.
 source $current_dir/helper/create_venv.sh
-create_venv in_venv
+create_venv
 
 if [ $using_existing_stack ]; then
   echo "Use an existing stack, skip testing stack synthesize and deploy"
@@ -189,13 +192,6 @@ else
       cd "$current_dir/test_install_policy"
       python3 delete_role.py $profile $region $policy_arn
   fi
-fi
-
-if [[ ${in_venv:-0} -ne 1 ]]; then
-  echo "Deactivate virtualenv"
-  deactivate
-else
-  echo "Run tests in virtualenv, no deactivate"
 fi
 
 echo "End of all tests"

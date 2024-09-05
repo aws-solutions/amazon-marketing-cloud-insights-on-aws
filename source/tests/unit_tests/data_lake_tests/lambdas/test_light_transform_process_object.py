@@ -171,7 +171,6 @@ def _s3_resource():
         s3.create_bucket(Bucket="raw_bucket")
         s3_object = s3.Object('raw_bucket', "adtech/datasetA/filename/filename")
         s3_object.put(Body="pre-stage file content")
-        print(s3_object.content_length)
         yield s3
 
 

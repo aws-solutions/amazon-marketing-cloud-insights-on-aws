@@ -110,7 +110,7 @@ def _dynamodb_resource():
                 "min_items_process": {"stage_c": 1, "stage_b": 1},
                 'pipeline': 'insights',
                 'transforms': {"stage_a_transform": "amc_light_transform",
-                               "stage_b_transform": "amc_heavy_transform"},
+                               "stage_b_transform": "default_heavy_transform"},
                 'version': 1
             }
         )

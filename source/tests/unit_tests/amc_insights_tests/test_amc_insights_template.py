@@ -38,7 +38,7 @@ def template(mock_solution):
     yield Template.from_stack(stack)
 
 
-STOCK_BASIC_EXECUTION_ROLE_COUNT = 30
+STOCK_BASIC_EXECUTION_ROLE_COUNT = 43
 
 
 def test_resource_counts(template):
@@ -242,9 +242,10 @@ def test_lambda_function_roles(template):
     
 # security-focused test cases
 def test_security_options(template):
-    from ..amc_insights_tests.security import s3_buckets, sagemaker, wfm_secret
+    from ..amc_insights_tests.security import s3_buckets, sagemaker, wfm_secret, kms_encryption
     
     s3_buckets.test_bucket_security(template)
     sagemaker.test_sagemaker_security(template)
     wfm_secret.test_wfm_secrets_security(template)
+    kms_encryption.test_data_security(template)
     

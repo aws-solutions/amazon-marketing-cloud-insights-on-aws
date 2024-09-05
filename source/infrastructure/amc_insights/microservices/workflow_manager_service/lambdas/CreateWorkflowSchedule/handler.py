@@ -14,10 +14,8 @@ RULE_PREFIX = os.environ['RULE_PREFIX']
 METRICS_NAMESPACE = os.environ['METRICS_NAMESPACE']
 RESOURCE_PREFIX = os.environ['RESOURCE_PREFIX']
 
-# Create a logger instance and pass that to the common utils lambda_function layer class so it can log errors
 logger = Logger(service="Workflow Management Service", level="INFO")
-
-Utils = wfm_utilities.Utils(logger)
+wfm_utils = wfm_utilities.Utils(logger)
 
 
 def events_update_rule(rule: dict, client) -> dict:
@@ -35,7 +33,7 @@ def events_update_rule(rule: dict, client) -> dict:
         EventBusName=rule['EventBusName']
 
     )
-    Utils.logger.info(response)
+    wfm_utils.logger.info(response)
     return response
 
 

@@ -80,7 +80,7 @@ class SDLFHeavyTransform(Construct):
             timeout=Duration.minutes(1),
             memory_size=256,
             architecture=lambda_.Architecture.ARM_64,
-            runtime=Runtime.PYTHON_3_9,
+            runtime=Runtime.PYTHON_3_11,
         )
 
         SolutionsLambdaFunctionAlarm(
@@ -109,7 +109,7 @@ class SDLFHeavyTransform(Construct):
             description="Redrive Data Lake StageB step function",
             timeout=Duration.minutes(1),
             memory_size=256,
-            runtime=Runtime.PYTHON_3_9,
+            runtime=Runtime.PYTHON_3_11,
             architecture=lambda_.Architecture.ARM_64,
         )
 
@@ -137,7 +137,7 @@ class SDLFHeavyTransform(Construct):
             description="Post update comprehensive catalogue metadata in Data Lake StageB",
             timeout=Duration.minutes(1),
             memory_size=256,
-            runtime=Runtime.PYTHON_3_9,
+            runtime=Runtime.PYTHON_3_11,
             architecture=lambda_.Architecture.ARM_64,
         )
 
@@ -166,7 +166,7 @@ class SDLFHeavyTransform(Construct):
             timeout=Duration.minutes(1),
             memory_size=256,
             architecture=lambda_.Architecture.ARM_64,
-            runtime=Runtime.PYTHON_3_9,
+            runtime=Runtime.PYTHON_3_11,
         )
 
         SolutionsLambdaFunctionAlarm(
@@ -192,7 +192,7 @@ class SDLFHeavyTransform(Construct):
             description="Send errors to DLQ in Data Lake StageB",
             timeout=Duration.minutes(1),
             memory_size=256,
-            runtime=Runtime.PYTHON_3_9,
+            runtime=Runtime.PYTHON_3_11,
             architecture=lambda_.Architecture.ARM_64,
         )
 
@@ -221,7 +221,7 @@ class SDLFHeavyTransform(Construct):
             timeout=Duration.minutes(15),
             memory_size=256,
             architecture=lambda_.Architecture.ARM_64,
-            runtime=Runtime.PYTHON_3_9,
+            runtime=Runtime.PYTHON_3_11,
         )
 
         SolutionsLambdaFunctionAlarm(
@@ -260,7 +260,7 @@ class SDLFHeavyTransform(Construct):
                 )
             ),
             layer_version_name=f"{self.resource_prefix}-metrics-layer",
-            compatible_runtimes=[Runtime.PYTHON_3_9],
+            compatible_runtimes=[Runtime.PYTHON_3_11],
         )
 
         data_lake_layer_version = LayerVersion.from_layer_version_arn(

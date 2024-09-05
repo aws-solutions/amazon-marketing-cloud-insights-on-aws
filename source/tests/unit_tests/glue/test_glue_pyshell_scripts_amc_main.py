@@ -37,6 +37,8 @@ def _mock_imports():
     mocked_awswrangler = MagicMock()
     sys.modules['awswrangler'] = mocked_awswrangler
     mocked_awswrangler.catalog.sanitize_table_name.return_value="glue_target_table"
+    mocked_utilities = MagicMock()
+    sys.modules['utilities'] = mocked_utilities
 
 @pytest.fixture(autouse=True)
 def record_metric_mock():

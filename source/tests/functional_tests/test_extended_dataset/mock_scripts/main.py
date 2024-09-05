@@ -20,12 +20,12 @@ spark_session = SparkSession.builder.config("hive.metastore.client.factory.class
                                             "com.amazonaws.glue.catalog.metastore.AWSGlueDataCatalogHiveClientFactory").enableHiveSupport().getOrCreate()
 sc = spark_session.sparkContext
 
-glueContext = GlueContext(sc)
-spark = glueContext.spark_session
-job = Job(glueContext)
+glue_context = GlueContext(sc)
+spark = glue_context.spark_session
+job = Job(glue_context)
 job.init(args['JOB_NAME'], args)
 
-memberships = glueContext.create_dynamic_frame.from_options(
+memberships = glue_context.create_dynamic_frame.from_options(
     connection_type="s3",
     format="json",
     connection_options={
@@ -40,11 +40,11 @@ memberships = glueContext.create_dynamic_frame.from_options(
 
 def overwrite_table(frame: DynamicFrame, db: str, table: str, dest_path: str, partitions: List[str] = []):
     if spark.sql(f"SHOW TABLES FROM {db} LIKE '{table}'").count() == 1:
-        glueContext.purge_s3_path(dest_path, options={"retentionPeriod": 0})
+        glue_context.purge_s3_path(dest_path, options={"retentionPeriod": 0})
         glue_client = boto3.client('glue')
         glue_client.delete_table(DatabaseName=db, Name=table)
 
-    sink = glueContext.getSink(
+    sink = glue_context.getSink(
         connection_type="s3",
         path=dest_path,
         enableUpdateCatalog=True,

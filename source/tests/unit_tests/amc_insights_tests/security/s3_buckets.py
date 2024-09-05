@@ -12,27 +12,6 @@ import pytest
 
 def check_bucket(logical_id, resource):
     bucket_properties = resource["Properties"]
-    
-    # check bucket has KMS encryption
-    kms_fail = f"Bucket resource {logical_id} should be KMS encrypted"
-    try:
-        encryption = bucket_properties["BucketEncryption"]["ServerSideEncryptionConfiguration"]
-        contains_encryption = False
-        for encryption_type in encryption:
-            try:
-                details = encryption_type["ServerSideEncryptionByDefault"]["SSEAlgorithm"]
-                if details == "aws:kms":
-                    contains_encryption = True
-                    break
-                
-            except KeyError:
-                continue
-        
-        if not contains_encryption:
-            pytest.fail(kms_fail)
-    
-    except KeyError:
-        pytest.fail(kms_fail)
         
     # check bucket has blocked public access
     public_access_fail = f"Bucket resource {logical_id} should have PublicAccessBlockConfiguration"

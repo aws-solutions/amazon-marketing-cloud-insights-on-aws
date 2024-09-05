@@ -9,25 +9,24 @@ import os
 from wfm_amc_api_interface import wfm_amc_api_interface
 from wfm_utilities import wfm_utilities
 from cloudwatch_metrics import metrics
-
-# Create a logger instance and pass that to the common utils lambda_function layer class so it can log errors
-logger = Logger(service="Workflow Management Service", level="INFO")
-
-Utils = wfm_utilities.Utils(logger)
+from microservice_shared import dynamodb
 
 METRICS_NAMESPACE = os.environ['METRICS_NAMESPACE']
 RESOURCE_PREFIX = os.environ['RESOURCE_PREFIX']
 
+logger = Logger(service="Workflow Management Service", level="INFO")
+wfm_utils = wfm_utilities.Utils(logger)
+dynamodb_helper = dynamodb.DynamodbHelper()
 
-def handler(event, context):
+
+def handler(event, _):
     metrics.Metrics(METRICS_NAMESPACE, RESOURCE_PREFIX, logger).put_metrics_count_value_1(
         metric_name="GetExecutionSummary")
 
-    event['EXECUTION_RUNNING_LAMBDA_NAME'] = context.function_name
-    customer_config = event['customerConfig']
+    customer_config = dynamodb_helper.deserialize_dynamodb_item(event["customerConfig"]["Item"])
 
     # set up the AMC API Interface
-    wfm = wfm_amc_api_interface.AMCAPIs(customer_config, Utils)
+    wfm = wfm_amc_api_interface.AMCAPIs(customer_config, wfm_utils)
 
     # get the execution Request
     execution_request = event.get('executionRequest', {})

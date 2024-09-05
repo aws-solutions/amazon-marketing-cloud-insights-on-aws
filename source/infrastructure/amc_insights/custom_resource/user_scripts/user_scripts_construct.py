@@ -60,7 +60,7 @@ class UserScriptsCustomResource(Construct):
             "CreateUserScripts",
             USER_SCRIPTS_PATH / "sync_user_scripts.py",
             "event_handler",
-            runtime=Runtime.PYTHON_3_9,
+            runtime=Runtime.PYTHON_3_11,
             description="Lambda function for custom resource for placing the user scripts in the S3 artifacts bucket",
             timeout=Duration.minutes(5),
             memory_size=256,

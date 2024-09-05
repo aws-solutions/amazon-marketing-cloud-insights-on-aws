@@ -60,10 +60,22 @@ class SDLFPipelineConstruct(Construct):
         self._create_lamda_layer()
         self.routing_function = self._create_routing_lambda()
 
+        event_pattern_names = [
+            "CopyObject",
+            "CompleteMultipartUpload",
+            "PutObject",
+            "DeleteObject"
+        ]
+
         # S3 Event Capture (Raw Bucket)
         self._create_s3_event_capture(
             bucket_name=self._foundations_resources.raw_bucket.bucket_name,
-            lambda_event_target=self.routing_function
+            lambda_event_target=self.routing_function,
+            event_data={
+                "event_pattern_names": event_pattern_names,
+                "event_rule_id": "raw-s3-bucket-event-capture",
+                "event_rule_description": "Capture data landing in the raw s3 bucket"
+            }
         )
 
         # Stage A
@@ -128,7 +140,7 @@ class SDLFPipelineConstruct(Construct):
                 )
             ),
             layer_version_name=f"{self._resource_prefix}-metrics-layer",
-            compatible_runtimes=[Runtime.PYTHON_3_9],
+            compatible_runtimes=[Runtime.PYTHON_3_11],
         )
 
     def _create_routing_lambda(self) -> Function:
@@ -142,7 +154,7 @@ class SDLFPipelineConstruct(Construct):
             description="Routes data to the right team and pipeline for processing",
             timeout=Duration.seconds(60),
             memory_size=256,
-            runtime=Runtime.PYTHON_3_9,
+            runtime=Runtime.PYTHON_3_11,
             architecture=lambda_.Architecture.ARM_64,
             environment={
                 "SOLUTION_ID": self.node.try_get_context("SOLUTION_ID"),
@@ -276,26 +288,20 @@ class SDLFPipelineConstruct(Construct):
 
         return routing_function
 
-    def _create_s3_event_capture(self, bucket_name, lambda_event_target):
-        event_names = [
-            "CopyObject",
-            "CompleteMultipartUpload",
-            "PutObject",
-            "DeleteObject"
-        ]
+    def _create_s3_event_capture(self, bucket_name, lambda_event_target, event_data):
 
         events.Rule(
             self,
-            id="raw-s3-bucket-event-capture",
-            rule_name=f"{self._resource_prefix}-raw-bucket-s3-event-capture",
-            description="Capture data landing in the raw s3 bucket",
+            id=event_data["event_rule_id"],
+            rule_name=f"{self._resource_prefix}-{event_data['event_rule_id']}",
+            description=event_data["event_rule_description"],
             event_pattern=events.EventPattern(
                 source=["aws.s3"],
                 detail={
                     "eventSource": [
                         "s3.amazonaws.com"
                     ],
-                    "eventName": event_names,
+                    "eventName": event_data["event_pattern_names"],
                     "requestParameters": {
                         "bucketName": [
                             bucket_name

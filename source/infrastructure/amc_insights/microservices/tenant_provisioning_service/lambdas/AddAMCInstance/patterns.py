@@ -24,7 +24,6 @@ ROUTING_QUEUE_LOGICAL_ID = os.environ['ROUTING_QUEUE_LOGICAL_ID']
 STAGE_A_ROLE_LOGICAL_ID = os.environ['STAGE_A_ROLE_LOGICAL_ID']
 
 logger = Logger(service="AddAMCInstance", level="INFO")
-cloudwatch_client = get_service_client
 
 
 class TpsDeployPatterns:
