@@ -4,7 +4,7 @@
 from constructs import Construct
 import aws_cdk.aws_iam as iam
 from aws_cdk import Aws, CfnOutput, Aspects
-from aws_solutions.cdk.cfn_nag import add_cfn_nag_suppressions, CfnNagSuppression
+from aws_solutions.cdk.cfn_nag import add_cfn_nag_suppressions, CfnNagSuppression, add_cfn_guard_suppressions
 
 from amc_insights.condition_aspect import ConditionAspect
 
@@ -263,6 +263,10 @@ class AdminPolicy(Construct):
                     reason="* permissions required for admin using this policy to access all deployed resources/actions through the console.")
             ]
         )
+        add_cfn_guard_suppressions(
+            resource=self.microservice_admin_policy.node.default_child,
+            suppressions=["IAM_POLICY_NON_COMPLIANT_ARN"]
+        )
 
     def _create_datalake_admin_policy(self):
         APPLICATION_REGION = Aws.REGION
@@ -387,6 +391,10 @@ class AdminPolicy(Construct):
                     rule_id="F5",
                     reason="Managed Policy is created for Admin User access to the Solution")
             ]
+        )
+        add_cfn_guard_suppressions(
+            resource=self.datalake_admin_policy.node.default_child,
+            suppressions=["IAM_POLICY_NON_COMPLIANT_ARN"]
         )
 
     def _create_cfn_output(self):

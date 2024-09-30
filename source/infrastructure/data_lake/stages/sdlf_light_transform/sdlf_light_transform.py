@@ -375,10 +375,7 @@ class SDLFLightTransform(Construct):
                         "s3-object-lambda:Get*",
                         "s3-object-lambda:List*"
                     ],
-                    resources=[
-                        "arn:aws:s3:::amc*",
-                        f"arn:aws:s3:::{self.resource_prefix}*",
-                    ],
+                    resources=["*"],
                     conditions={
                         "StringEquals": {
                             "aws:ResourceAccount": [

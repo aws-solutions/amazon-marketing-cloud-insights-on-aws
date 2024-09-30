@@ -41,9 +41,6 @@ Resources:
               - !Sub "arn:aws:s3:::${Bucket}/*"
               - !GetAtt Bucket.Arn
             Condition:
-              ArnLike:
-                aws:SourceArn:
-                  - "arn:aws:s3:::amc*"
               StringEquals:
                 aws:SourceAccount: !Sub "${AWS::AccountId}"
 

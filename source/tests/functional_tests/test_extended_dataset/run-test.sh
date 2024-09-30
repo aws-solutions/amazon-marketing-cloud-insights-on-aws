@@ -150,7 +150,7 @@ echo "-----------------------------------------"
 
 cd $deployment_dir
 
-version_code="v3.1.0"
+version_code="v3.1.1"
 
 build-s3-cdk-dist deploy \
   --source-bucket-name $template_bucket_name \
