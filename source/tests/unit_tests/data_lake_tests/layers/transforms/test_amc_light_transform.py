@@ -1,3 +1,5 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: Apache-2.0
 # ###############################################################################
 # PURPOSE:
 #   * Unit test for amc_light_transform.py

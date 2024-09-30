@@ -236,11 +236,7 @@ class TenantProvisioningService(Construct):
                         "s3:PutObject",  # NOSONAR
                         "s3:PutBucketVersioning",
                     ],
-                    resources=[
-                        "arn:aws:s3:::amc*",
-                        self._solution_buckets.artifacts_bucket.bucket_arn,
-                        f"{self._solution_buckets.artifacts_bucket.bucket_arn}/*"
-                    ],
+                    resources=["*"],
                     conditions={
                         "StringEquals": {
                             AWS_RESOURCE_ACCOUNT_KEY: [
@@ -555,9 +551,7 @@ class TenantProvisioningService(Construct):
                         "s3:PutBucketNotification",
                         "s3:GetBucketNotification"
                     ],
-                    resources=[
-                        "arn:aws:s3:::amc*",
-                    ],
+                    resources=["*"],
                     conditions={
                         "StringEquals": {
                             AWS_RESOURCE_ACCOUNT_KEY: [

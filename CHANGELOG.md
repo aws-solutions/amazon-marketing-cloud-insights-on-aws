@@ -5,20 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.1] - 2024-09-30
+
+### Added
+
+- Fixed bug in the TPS microservice for stacks not starting with "amc."
+- Updated IAM_POLICY_INSTALL.json to include additional permissions for console deployments.
+
 ## [3.1.0] - 2024-09-05
 
 ### Added
 
 - Added support for retrieving reporting data from Amazon Ads API and Selling Partner API.
-- Added support for handling multiple authenticated credentials. 
-- Cataloged the reporting data in AWS Glue using the Data Lake. 
-
+- Added support for handling multiple authenticated credentials.
+- Cataloged the reporting data in AWS Glue using the Data Lake.
 
 ## [3.0.0] - 2024-05-30
 
 ### Added
 
-- Implemented support for the Amazon Ads API while phasing out the previous authentication system    
+- Implemented support for the Amazon Ads API while phasing out the previous authentication system
 
 ## [2.0.3] - 2024-02-20
 
@@ -77,4 +83,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Final version before promotion to AWS Solutions
-

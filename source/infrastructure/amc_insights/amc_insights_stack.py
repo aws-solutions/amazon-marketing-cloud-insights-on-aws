@@ -82,7 +82,7 @@ class Microservice:
 
 class AMCInsightsStack(SolutionStack):
     name = "amcinsights"
-    description = "Amazon Marketing Cloud Insights"
+    description = "Amazon Marketing Cloud Insights on AWS"
     template_filename = "amazon-marketing-cloud-insights.template"
 
     def __init__(self, scope: Construct, id: str, *args: Any, **kwargs: Any) -> None:
