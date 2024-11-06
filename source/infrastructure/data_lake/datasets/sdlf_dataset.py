@@ -233,7 +233,7 @@ class SDLFDatasetConstruct(Construct):
             default_arguments={
                 "--job-bookmark-option": "job-bookmark-enable",
                 "--enable-metrics": "",
-                "--additional-python-modules": "awswrangler>=2.4.0,aws-lambda-powertools>=2.15.0",
+                "--additional-python-modules": "awswrangler==3.9.1,aws-lambda-powertools>=2.15.0",
                 "--enable-job-insights": "true",
                 "--extra-py-files": f"s3://{self._solution_buckets.artifacts_bucket.bucket_name}/{self._shared_modules_path}",
                 "--SOLUTION_ID": self.node.try_get_context("SOLUTION_ID"),
