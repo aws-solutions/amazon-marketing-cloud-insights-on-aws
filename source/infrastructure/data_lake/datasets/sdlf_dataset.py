@@ -22,7 +22,6 @@ from data_lake.foundations.foundations_construct import FoundationsConstruct
 from data_lake.stages.sdlf_heavy_transform.sdlf_heavy_transform import SDLFHeavyTransform
 from aws_cdk import Aws, Aspects
 from amc_insights.condition_aspect import ConditionAspect
-from data_lake.glue.glue_scripts_uploader import GlueScriptsUploader
 
 
 class SDLFDatasetConstruct(Construct):

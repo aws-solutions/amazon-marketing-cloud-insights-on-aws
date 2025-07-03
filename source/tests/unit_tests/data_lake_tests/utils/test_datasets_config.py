@@ -10,7 +10,7 @@
 
 import json
 from data_lake.utils.datasets_config import DatasetsConfigs, SDLFDatasetParameters
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import mock_open, patch
 
 
 def test_data_sets_configs_cls():
@@ -28,8 +28,8 @@ def test_data_sets_configs_cls():
     ]
     with patch(
             "builtins.open", mock_open(read_data=json.dumps({environment_id: configs}))
-        ) as mock_file:
-
+    ) as mock_file:
         parameters = DatasetsConfigs(environment_id, config_file_path).dataset_configs
     mock_file.assert_called_with(config_file_path)
-    assert parameters == [SDLFDatasetParameters(dataset='1234', pipeline='some_pipeline', stage_a_transform='testa', stage_b_transform='testb')]
+    assert parameters == [SDLFDatasetParameters(dataset='1234', pipeline='some_pipeline', stage_a_transform='testa',
+                                                stage_b_transform='testb', description="SDLF Dataset 1234")]

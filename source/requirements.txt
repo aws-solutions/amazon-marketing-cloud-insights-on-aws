@@ -9,7 +9,7 @@ pytest-mock>=3.10.0
 moto>=5.0.0
 cdk-nag
 pandas
-pyspark
+pyspark==3.5.6
 docker
 openapi-spec-validator
 pyparsing

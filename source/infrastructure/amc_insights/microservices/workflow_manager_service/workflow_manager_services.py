@@ -1000,7 +1000,7 @@ class WorkFlowManagerService(Construct):
             self,
             'Set Execution Notification Body',
             expression="`${$.messageSubject}\n\nCustomer Id: ${$.customerId}\nRequest Type: ${$.executionRequest.requestType}\nWorkflow Execution Name: ${$.workflowExecutionName}\nResponse Status: ${$.responseStatus}\nResponse Message: ${$.responseMessage}\n\n--\nWorkflow Execution Request:\n\n${$.snsMessage.default}`",
-            runtime=_lambda.Runtime.NODEJS_18_X,
+            runtime=_lambda.Runtime.NODEJS_20_X,
             result_path="$.snsMessage.email"
         ).next(publish_execution_sns)
         pass_copy_execution_to_snsmessage = stepfunctions.Pass(
@@ -1013,7 +1013,7 @@ class WorkFlowManagerService(Construct):
             self,
             'Set Execution Notification Subject',
             expression="`${$.customerId} ${$.executionRequest.requestType} for ${$.workflowExecutionName} ${$.responseStatus}`.slice(0,100)",
-            runtime=_lambda.Runtime.NODEJS_18_X,
+            runtime=_lambda.Runtime.NODEJS_20_X,
             result_path="$.messageSubject").next(pass_copy_execution_to_snsmessage)
 
         choice_evaluate_execution_status_response.when(
@@ -1186,7 +1186,7 @@ class WorkFlowManagerService(Construct):
             self,
             'Set Workflow Notification Body',
             expression="`${$.messageSubject}\n\nCustomer Id: ${$.customerId}\nRequest Type: ${$.workflowRequest.requestType}\nWorkflow Id: ${$.workflowRequest.workflowId}\nResponse Status: ${$.responseStatus}\nResponse Message: ${$.responseMessage}\n\n--\nWorkflow Request:\n\n${$.snsMessage.default}`",
-            runtime=_lambda.Runtime.NODEJS_18_X,
+            runtime=_lambda.Runtime.NODEJS_20_X,
             result_path="$.snsMessage.email").next(
             publish_workflow_sns
         )
@@ -1197,7 +1197,7 @@ class WorkFlowManagerService(Construct):
             self,
             'Set Message Notification Subject',
             expression="`${$.customerId} ${$.workflowRequest.requestType} for ${$.workflowRequest.workflowId} ${$.responseStatus}`.slice(0,100)",
-            runtime=_lambda.Runtime.NODEJS_18_X,
+            runtime=_lambda.Runtime.NODEJS_20_X,
             result_path="$.messageSubject").next(
             pass_copy_to_snsmessage
         )
