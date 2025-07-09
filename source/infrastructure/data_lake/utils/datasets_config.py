@@ -14,6 +14,7 @@ class SDLFDatasetParameters:
     pipeline: str
     stage_a_transform: str
     stage_b_transform: str
+    description: str | None = None
 
 
 class DatasetsConfigs:
@@ -34,6 +35,7 @@ class DatasetsConfigs:
                         stage_a_transform=config["config"]["stage_a_transform"],
                         stage_b_transform=config["config"]["stage_b_transform"],
                     )
+                    dataset_parameters.description = f"SDLF Dataset {config.get('dataset', '')}"
                     parameters.append(dataset_parameters)
                 except KeyError as e:
                     logger.error("Missing configurations for the dataset parameters in file datasets_parameters.json.")
