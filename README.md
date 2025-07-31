@@ -1,7 +1,5 @@
 # Amazon Marketing Cloud Insights on AWS
 
-Amazon Marketing Cloud Insights on AWS
-
 ### The [Amazon Marketing Cloud Insights on AWS](https://aws.amazon.com/solutions/implementations/amazon-marketing-cloud-insights-on-aws/) solution will retire in November 2025
 
 Deployments (via CloudFormation or GitHub) will remain operational, but customers will assume responsibility for maintenance and API-related updates post-retirement.
