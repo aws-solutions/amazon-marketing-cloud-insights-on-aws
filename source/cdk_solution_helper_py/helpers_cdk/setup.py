@@ -43,14 +43,14 @@ setuptools.setup(
         "aws_cdk_lib>=2.7.0",
         "Click>=7.1.2",
         "boto3>=1.17.52",
-        "requests>=2.32.0",
+        "requests==2.32.4",
         "crhelper>=2.0.6",
     ],
     entry_points="""
         [console_scripts]
         build-s3-cdk-dist=aws_solutions.cdk.scripts.build_s3_cdk_dist:cli
     """,
-    python_requires=">=3.7",
+    python_requires=">=3.11",
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
@@ -60,6 +60,7 @@ setuptools.setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.11",
         "Topic :: Software Development :: Code Generators",
         "Topic :: Utilities",
         "Typing :: Typed",

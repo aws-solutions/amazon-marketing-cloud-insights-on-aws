@@ -19,7 +19,7 @@ A clear and concise description of what you expected to happen.
 **Please complete the following information about the solution:**
 - [ ] Version: [e.g. v1.0.0]
 
-To get the version of the solution, you can look at the description of the created CloudFormation stack. For example, "_(SO0193) - Amazon Marketing Cloud Insights. Version **v1.0.0**_". If you have not yet installed the stack, or are unable to install due to a problem, you can find the version and solution ID in the template with a text editor. Open the .template file and search for `SOLUTION_VERSION` in the content. You will find several matches and they will all be the same value:
+To get the version of the solution, you can look at the description of the created CloudFormation stack. For example, "_(SO0193) - Amazon Marketing Cloud Insights on AWS. Version **v1.0.0**_". If you have not yet installed the stack, or are unable to install due to a problem, you can find the version and solution ID in the template with a text editor. Open the .template file and search for `SOLUTION_VERSION` in the content. You will find several matches and they will all be the same value:
 
 ```json
     "Environment": {

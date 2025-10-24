@@ -1,6 +1,6 @@
 ## Prerequisites
 
-- [Python 3.9](https://www.python.org/downloads/)
+- [Python 3.11](https://www.python.org/downloads/)
 - [AWS CDK](https://aws.amazon.com/cdk/) version 2.45.0 or higher
 
 ## Build the solution for deployment

@@ -31,7 +31,7 @@ setuptools.setup(
     url="https://aws.amazon.com/solutions/implementations",
     license="Apache License 2.0",
     packages=setuptools.find_namespace_packages(),
-    python_requires=">=3.9",
+    python_requires=">=3.11",
     classifiers=[
         "Intended Audience :: Developers",
         "License :: OSI Approved :: Apache Software License",
@@ -39,5 +39,6 @@ setuptools.setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.11",
     ],
 )
