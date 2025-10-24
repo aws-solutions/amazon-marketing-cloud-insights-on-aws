@@ -31,7 +31,7 @@ The Purpose of the AMC Insights Data Lake Framework is to shorten the deployment
 ## Prerequisites
 
 * [AWS Command Line Interface](https://aws.amazon.com/cli/)
-* [Python](https://www.python.org/) 3.9 or newer
+* [Python](https://www.python.org/) 3.11 or newer
 * [Node.js](https://nodejs.org/en/) 16.x or newer
 * [AWS CDK](https://aws.amazon.com/cdk/) 2.60.0 or newer
 * IDE for e.g. [Pycharm](https://www.jetbrains.com/pycharm/) or [AWS Cloud9](https://aws.amazon.com/cloud9/)

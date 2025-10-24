@@ -20,7 +20,6 @@ from aws_solutions.cdk.stack import SolutionStack
 from data_lake.utils.datasets_config import DatasetsConfigs
 from amc_insights.solution_buckets.solution_buckets import SolutionBuckets
 from amc_insights.integration.integration_construct import IntegrationConstruct
-from amc_insights.app_registry import AppRegistry
 from amc_insights.custom_resource.user_scripts.user_scripts_construct import UserScriptsCustomResource
 from amc_insights.admin_policy.admin_policy_construct import AdminPolicy
 from amc_insights.custom_resource.lakeformation_settings.lakeformation_settings import LakeformationSettings
@@ -91,7 +90,6 @@ class AMCInsightsStack(SolutionStack):
 
         # Aspects
         self._suppress_cfn_nag_warnings_on_stack()
-        Aspects.of(self).add(AppRegistry(self, f'AppRegistry-{id}'))
 
         self._environment_id = "dev"
         self._team = "adtech"

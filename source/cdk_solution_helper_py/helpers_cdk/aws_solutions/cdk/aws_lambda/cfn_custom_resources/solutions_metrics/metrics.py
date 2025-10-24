@@ -40,7 +40,7 @@ class Metrics(Construct):
             / "custom_resources"
             / "metrics.py",
             function="handler",
-            runtime=lambda_.Runtime.PYTHON_3_9,
+            runtime=lambda_.Runtime.PYTHON_3_11,
         )
         add_cfn_nag_suppressions(
             resource=self._metrics_function.node.default_child,

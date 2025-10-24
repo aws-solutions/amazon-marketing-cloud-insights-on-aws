@@ -36,3 +36,6 @@ source/cdk_solution_helper_py/helpers_cdk/build/*
 # local sonarqube
 .scannerwork/*
 
+# Builder tools
+build/*
+

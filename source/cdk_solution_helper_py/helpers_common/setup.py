@@ -32,8 +32,8 @@ setuptools.setup(
     license="Apache License 2.0",
     packages=setuptools.find_namespace_packages(exclude=("build",)),
     install_requires=[
-        "boto3>=1.17.52",
-        "pip>=22.3",
+        "boto3>=1.40.3",
+        "pip>=25.2",
     ],
     python_requires=">=3.7",
     classifiers=[
@@ -45,6 +45,7 @@ setuptools.setup(
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.11",
         "Topic :: Software Development :: Code Generators",
         "Topic :: Utilities",
         "Typing :: Typed",
