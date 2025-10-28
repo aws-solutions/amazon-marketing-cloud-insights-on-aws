@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Upgrade Python Lambda runtimes from 3.9 to 3.11
+- Remove AWS Service Catalog AppRegistry Integration
 
 ## [3.1.3] - 2025-07-02
 
